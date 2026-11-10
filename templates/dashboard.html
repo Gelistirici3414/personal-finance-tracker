@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Kişisel Finans Takip{% endblock %}
+
+{% block content %}
+<!-- Smart Bill & Debt Reminders -->
+{% if due_soon %}
+<div class="bg-yellow-900/40 border border-yellow-600 rounded-lg p-4 mb-8">
+    <h2 class="text-lg font-semibold text-yellow-300 mb-2">
+        <svg class="inline w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a7 7 0 00-6.98 6 7 7 0 00.1 1.05L3 15h14l-.12-5.95A7 7 0 0010 2zm0 14a2 2 0 01-2-2h4a2 2 0 01-2 2z"/></svg>
+        Yaklaşan Ödemeler (3-5 Gün İçinde)
+    </h2>
+    <ul class="space-y-2">
+        {% for p in due_soon %}
+        <li class="flex justify-between items-center text-gray-200 text-sm">
+            <span>
+                <span class="inline-block bg-yellow-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded mr-2">{{ p.due_date.strftime('%d.%m.%Y') }}</span>
+                {{ p.title }}
+            </span>
+            <span class="font-semibold text-yellow-300">{{ "{:,.2f}".format(p.amount) }}₺</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-medium text-gray-400">Toplam Bakiye</h3>
+        <p class="text-3xl font-bold text-green-400">{{ "{:,.2f}".format(total_balance) }} ₺</p>
+    </div>
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-medium text-gray-400">Bu Ay Gelir</h3>
+        <p class="text-3xl font-bold text-blue-400">{{ "{:,.2f}".format(income_sum) }} ₺</p>
+    </div>
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-medium text-gray-400">Bu Ay Gider</h3>
+        <p class="text-3xl font-bold text-red-400">{{ "{:,.2f}".format(expense_sum) }} ₺</p>
+    </div>
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-medium text-gray-400">Bekleyen Ödemeler</h3>
+        <p class="text-3xl font-bold text-yellow-400">{{ pending_payments|length }}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Pie Chart: Spending by Category -->
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h2 class="text-xl font-semibold mb-4">Harcama Kategorileri (Bu Ay)</h2>
+        <canvas id="spendingPieChart" height="300"></canvas>
+    </div>
+    <!-- Line Chart: Balance Trend -->
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h2 class="text-xl font-semibold mb-4">Bakiye Trendi (Son 6 Ay)</h2>
+        <canvas id="balanceLineChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- AI Insights -->
+<div class="bg-gray-800 p-6 rounded shadow">
+    <h2 class="text-xl font-semibold mb-4">Yapay Zeka İçgörüleri</h2>
+    <ul class="space-y-2">
+        {% for insight in insights %}
+        <li class="flex items-center text-gray-300">
+            <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {{ insight }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% if budget_info %}
+<div class="mt-8">
+    <h2 class="text-2xl font-semibold mb-4">Kategoriler için Bütçe Durumu</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for b in budget_info %}
+        <div class="bg-gray-800 p-4 rounded shadow">
+            <div class="flex justify-between mb-2">
+                <span>{{ b.category }}</span>
+                <span class="text-gray-400">{{ "{:,.2f}".format(b.spent) }} / {{ "{:,.2f}".format(b.limit) }}₺</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded h-4">
+                <div class="h-4 rounded" style="width: {{ b.percent }}%; background-color: {{ '#ef4444' if b.percent > 100 else '#34d399' }};"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Data from Flask
+    const categories = {{ categories|tojson }};
+    const amounts = {{ amounts|tojson }};
+    const trendLabels = {{ trend_labels|tojson }};
+    const trendData = {{ trend_data|tojson }};
+
+    // Pie Chart
+    new Chart(document.getElementById('spendingPieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: categories,
+            datasets: [{
+                data: amounts,
+                backgroundColor: [
+                    '#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa', '#f472b6', '#34d399', '#fb923c'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'right', labels: { color: '#e5e7eb' } }
+            }
+        }
+    });
+
+    // Line Chart
+    new Chart(document.getElementById('balanceLineChart'), {
+        type: 'line',
+        data: {
+            labels: trendLabels,
+            datasets: [{
+                label: 'Net Bakiye',
+                data: trendData,
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: '#e5e7eb' } } },
+            scales: {
+                x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+            }
+        }
+    });
+</script>
+{% endblock %}

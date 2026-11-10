@@ -1,0 +1,19 @@
+{
+  "name": "Kişisel Finans Takip",
+  "short_name": "Finans",
+  "description": "Hesap, harcama, bütçe ve borç takibi yapan kişisel finans uygulaması.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111827",
+  "theme_color": "#1f2937",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

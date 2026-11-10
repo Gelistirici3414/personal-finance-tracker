@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Giriş Yap - Kişisel Finans Takip{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[70vh]">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md">
+        <h1 class="text-3xl font-bold text-center text-white mb-2">Kişisel Finans Takip</h1>
+        <p class="text-gray-400 text-center mb-6">Devam etmek için giriş yapın</p>
+
+        {% if error %}
+        <div class="bg-red-900/40 border border-red-600 text-red-200 text-sm rounded p-3 mb-4">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next', '')) }}" class="space-y-4">
+            <div>
+                <label class="block text-gray-300 mb-1">Kullanıcı Adı</label>
+                <input type="text" name="username" required autofocus
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-1">Şifre</label>
+                <input type="password" name="password" required
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold">Giriş Yap</button>
+        </form>
+        <p class="text-center text-sm text-gray-400 mt-4">
+            Hesabın yok mu?
+            <a href="{{ url_for('auth.register') }}" class="text-green-400 hover:text-green-300 font-semibold">Kayıt ol</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

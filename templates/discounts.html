@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}İndirimler - Kişisel Finans Takip{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-2">Market Fırsatları &amp; Broşür İndirimleri</h1>
+<p class="text-gray-400 mb-6">BİM, A101, ŞOK ve Migros'un güncel kampanya ve broşür fırsatlarını tek sayfada görüntüleyin.</p>
+
+<!-- Search + Filter -->
+<form method="GET" action="{{ url_for('discounts.discounts') }}" class="flex flex-col md:flex-row gap-3 mb-6">
+    <input type="text" name="search" value="{{ search }}" placeholder="Ürün veya market ara..."
+           class="w-full md:w-64 p-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500">
+    <button type="submit" class="p-2 bg-green-600 hover:bg-green-700 text-white rounded">Ara</button>
+    {% if active_market or search %}
+    <a href="{{ url_for('discounts.discounts') }}" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded">Temizle</a>
+    {% endif %}
+</form>
+
+<!-- Market Tabs -->
+<div class="flex gap-2 mb-6 flex-wrap">
+    <a href="{{ url_for('discounts.discounts') }}" class="px-3 py-1 rounded {{ 'bg-green-600 text-white' if not active_market else 'bg-gray-800 text-gray-300 hover:bg-gray-700' }}">Tümü</a>
+    {% for m in markets %}
+    <a href="{{ url_for('discounts.discounts', market=m) }}" class="px-3 py-1 rounded {{ 'bg-green-600 text-white' if active_market == m else 'bg-gray-800 text-gray-300 hover:bg-gray-700' }}">{{ m }}</a>
+    {% endfor %}
+</div>
+
+<!-- Deals Grid -->
+{% if deals %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for d in deals %}
+    <div class="bg-gray-800 p-5 rounded-lg shadow hover:shadow-lg transition">
+        <div class="flex justify-between items-start mb-3">
+            <span class="text-xs font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">{{ d.market }}</span>
+            <span class="text-green-400 font-bold text-lg">{{ d.discount }}</span>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-1">{{ d.product }}</h3>
+        <p class="text-gray-400 text-sm mb-3">Kaynak: {{ d.brochure }}</p>
+        {% if d.price and d.price != '-' %}
+        <p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ d.price }}</span></p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-gray-800 p-10 text-center rounded-lg">
+    <p class="text-gray-400 text-lg">Eşleşen indirim bulunamadı.</p>
+</div>
+{% endif %}
+{% endblock %}

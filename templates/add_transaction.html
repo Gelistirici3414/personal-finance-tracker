@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Hareket Ekle{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Yeni Hareket Ekle</h2>
+
+{% if receipt_data and receipt_data.raw_text %}
+<div class="bg-blue-900/40 border border-blue-600 rounded-lg p-4 mb-6">
+    <p class="text-blue-200 text-sm mb-1">Fiş tarandı, form otomatik dolduruldu (gerekirse düzenleyin):</p>
+    <pre class="text-gray-400 text-xs whitespace-pre-wrap max-h-32 overflow-auto">{{ receipt_data.raw_text }}</pre>
+</div>
+{% endif %}
+
+<a href="{{ url_for('transactions.upload_receipt') }}" class="inline-block mb-4 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Fiş Yükle (OCR)</a>
+
+<form method="POST" class="bg-gray-800 p-6 rounded shadow max-w-xl">
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Hesap</label>
+        <select name="account_id" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            {% for acc in accounts %}
+            <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.type }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Tür</label>
+        <select name="type" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="income">Gelir</option>
+            <option value="expense">Gider</option>
+        </select>
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Miktar</label>
+        <input type="number" step="0.01" name="amount" required
+               value="{{ receipt_data.amount|default('', true)|string if receipt_data else '' }}"
+               class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Kategori</label>
+        <input type="text" name="category" required
+               value="{{ receipt_data.category|default('', true) if receipt_data else '' }}"
+               class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Açıklama</label>
+        <textarea name="description" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">{{ receipt_data.description|default('', true) if receipt_data else '' }}</textarea>
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Kişi (Borç/Alacak için)</label>
+        <input type="text" name="person_name" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Tarih</label>
+        <input type="date" name="date" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded">Kaydet</button>
+    <a href="{{ url_for('transactions.list_transactions') }}" class="block text-center mt-2 text-gray-400 hover:text-white">İptal</a>
+</form>
+{% endblock %}

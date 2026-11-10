@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Borçlar{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Borçlar / Alacaklar</h2>
+<a href="{{ url_for('debts.add_debt') }}" class="inline-block mb-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Yeni Borç/Alacak Ekle</a>
+<table class="min-w-full bg-gray-800">
+    <thead>
+        <tr>
+            <th class="px-4 py-2">ID</th>
+            <th class="px-4 py-2">Başlık</th>
+            <th class="px-4 py-2">Miktar</th>
+            <th class="px-4 py-2">Kategori</th>
+            <th class="px-4 py-2">Son Tarih</th>
+            <th class="px-4 py-2">Durum</th>
+            <th class="px-4 py-2">İşlem</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for debt in debts %}
+        <tr class="border-t border-gray-700 {{ 'opacity-60' if debt.status == 'paid' }}">
+            <td class="px-4 py-2">{{ debt.id }}</td>
+            <td class="px-4 py-2">{{ debt.title }}</td>
+            <td class="px-4 py-2">{{ "{:,.2f}".format(debt.amount) }}₺</td>
+            <td class="px-4 py-2">{{ debt.category }}</td>
+            <td class="px-4 py-2">{{ debt.due_date }}</td>
+            <td class="px-4 py-2">
+                {% if debt.status == 'paid' %}
+                    <span class="inline-block bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded">Ödendi</span>
+                {% else %}
+                    <span class="inline-block bg-yellow-600 text-white text-xs font-bold px-2 py-0.5 rounded">Bekliyor</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2">
+                {% if debt.status == 'pending' %}
+                <a href="{{ url_for('debts.mark_debt_paid', id=debt.id) }}"
+                   class="text-green-400 hover:text-green-300 text-sm font-medium mr-4">✓ Ödendi İşaretle</a>
+                {% endif %}
+                <a href="{{ url_for('debts.delete_debt', id=debt.id) }}"
+                   class="text-red-400 hover:text-red-300 text-sm font-medium"
+                   onclick="return confirm('Bu kaydı silmek istediğinize emin misiniz?');">Sil</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

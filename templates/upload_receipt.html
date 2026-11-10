@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Fiş Yükle{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Fiş / OCR Tara</h2>
+<p class="text-gray-400 mb-6">Bir fiş görseli veya PDF'i yükleyin. Uygulama metni çıkarıp miktar, kategori ve açıklamayı otomatik doldurur.</p>
+<form method="POST" action="{{ url_for('transactions.upload_receipt') }}" enctype="multipart/form-data" class="bg-gray-800 p-6 rounded shadow max-w-xl">
+    <div class="mb-4">
+        <label class="block text-gray-300 mb-1">Fiş Dosyası (jpg, png, pdf)</label>
+        <input type="file" name="receipt_file" accept="image/*,application/pdf" required
+               class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+    </div>
+    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded">Tara</button>
+    <a href="{{ url_for('transactions.add_transaction') }}" class="block text-center mt-2 text-gray-400 hover:text-white">İptal</a>
+</form>
+
+{% if receipt_data and receipt_data.raw_text %}
+<div class="mt-6 bg-blue-900/40 border border-blue-600 rounded-lg p-4 max-w-xl">
+    <p class="text-blue-200 text-sm mb-2">Çıkarılan Metin:</p>
+    <pre class="text-gray-400 text-xs whitespace-pre-wrap max-h-40 overflow-auto">{{ receipt_data.raw_text }}</pre>
+    {% if receipt_data.amount %}
+    <p class="text-green-300 text-sm mt-2">Tanımlanan miktar: {{ receipt_data.amount|float }}₺ • Kategori: {{ receipt_data.category }}</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
