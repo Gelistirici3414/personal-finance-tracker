@@ -1,5 +1,6 @@
 Flask==3.0.3
 Flask_SQLAlchemy==3.1.1
+gunicorn
 # Optional: real OCR for receipt scanning.
 # pytesseract + Pillow: OCR on images (needs Tesseract OCR binary installed)
 # PyPDF2: text extraction from PDF receipts
