@@ -24,7 +24,10 @@
             </div>
             <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold">Giriş Yap</button>
         </form>
-        <p class="text-center text-sm text-gray-400 mt-4">
+        <p class="text-center text-sm mt-4">
+            <a href="{{ url_for('auth.forgot_password') }}" class="text-blue-400 hover:text-blue-300 font-medium">Şifremi Unuttum</a>
+        </p>
+        <p class="text-center text-sm text-gray-400 mt-2">
             Hesabın yok mu?
             <a href="{{ url_for('auth.register') }}" class="text-green-400 hover:text-green-300 font-semibold">Kayıt ol</a>
         </p>

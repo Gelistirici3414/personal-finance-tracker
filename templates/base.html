@@ -22,27 +22,62 @@
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2" style="max-width:340px"></div>
 
     <nav class="bg-gray-800 p-4">
-        <div class="flex flex-wrap items-center gap-4">
-            <ul class="flex space-x-4 flex-wrap">
+        <div class="flex items-center gap-3 flex-wrap">
+            <!-- Brand (mobile + desktop) -->
+            <a href="{{ url_for('dashboard.dashboard') }}" class="font-bold text-green-400 text-lg shrink-0">₺ Finans</a>
+
+            <!-- Desktop pill nav -->
+            <ul class="hidden md:flex flex-wrap gap-2 ml-auto">
                 {% if is_logged_in %}
-                <li><a href="{{ url_for('dashboard.dashboard') }}" class="hover:text-green-300">Dashboard</a></li>
-                <li><a href="{{ url_for('accounts.list_accounts') }}" class="hover:text-green-300">Hesaplar</a></li>
-                <li><a href="{{ url_for('transactions.list_transactions') }}" class="hover:text-green-300">Hareketler</a></li>
-                <li><a href="{{ url_for('payments.list_payments') }}" class="hover:text-green-300">Ödemeler</a></li>
-                <li><a href="{{ url_for('debts.list_debts') }}" class="hover:text-green-300">Borçlar</a></li>
-                <li><a href="{{ url_for('budgets.list_budgets') }}" class="hover:text-green-300">Bütçeler</a></li>
-                <li><a href="{{ url_for('discounts.discounts') }}" class="hover:text-green-300">İndirimler</a></li>
+                <li><a href="{{ url_for('dashboard.dashboard') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Dashboard</a></li>
+                <li><a href="{{ url_for('accounts.list_accounts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Hesaplar</a></li>
+                <li><a href="{{ url_for('transactions.list_transactions') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Hareketler</a></li>
+                <li><a href="{{ url_for('payments.list_payments') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Ödemeler</a></li>
+                <li><a href="{{ url_for('debts.list_debts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Borçlar</a></li>
+                <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Bütçeler</a></li>
+                <li><a href="{{ url_for('discounts.discounts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">İndirimler</a></li>
                 {% endif %}
             </ul>
-            <div class="ml-auto">
+
+            <!-- Auth button (desktop) -->
+            <div class="ml-auto md:ml-0">
                 {% if is_logged_in %}
                 <a href="{{ url_for('auth.logout') }}"
-                   class="inline-block bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded">Çıkış</a>
+                   class="hidden md:inline-block bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded-full">Çıkış</a>
                 {% else %}
                 <a href="{{ url_for('auth.login') }}"
-                   class="inline-block bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded">Giriş</a>
+                   class="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded-full">Giriş</a>
                 {% endif %}
             </div>
+
+            <!-- Mobile hamburger toggle -->
+            <button id="mobile-menu-btn" aria-label="Menüyü aç/kapat"
+                    class="ml-auto md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+                    onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mobile dropdown menu -->
+        <div id="mobile-menu" class="hidden md:hidden mt-4 pt-4 border-t border-gray-700">
+            <ul class="flex flex-wrap gap-2">
+                {% if is_logged_in %}
+                <li><a href="{{ url_for('dashboard.dashboard') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Dashboard</a></li>
+                <li><a href="{{ url_for('accounts.list_accounts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Hesaplar</a></li>
+                <li><a href="{{ url_for('transactions.list_transactions') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Hareketler</a></li>
+                <li><a href="{{ url_for('payments.list_payments') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Ödemeler</a></li>
+                <li><a href="{{ url_for('debts.list_debts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Borçlar</a></li>
+                <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Bütçeler</a></li>
+                <li><a href="{{ url_for('discounts.discounts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">İndirimler</a></li>
+                {% endif %}
+                {% if is_logged_in %}
+                <li><a href="{{ url_for('auth.logout') }}" class="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-700 text-white transition w-full text-center">Çıkış</a></li>
+                {% else %}
+                <li><a href="{{ url_for('auth.login') }}" class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white transition w-full text-center">Giriş</a></li>
+                {% endif %}
+            </ul>
         </div>
     </nav>
     <main class="flex-1 container mx-auto p-4">

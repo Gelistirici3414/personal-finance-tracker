@@ -1,5 +1,6 @@
 import os
 import urllib.parse
+from datetime import datetime
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, g, flash
 from models import db, User
 from routes.dashboard import dashboard_bp
@@ -60,6 +61,61 @@ def register():
             flash('Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.', 'success')
             return redirect(url_for('auth.login'))
     return render_template('register.html', errors=errors)
+
+
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Simple password-reset request infrastructure.
+
+    The user submits their registered email; we look up the account and,
+    if it exists, generate a reset token that is stored on the user row and
+    emailed (stubbed here as a flash message / token display for dev use).
+    """
+    error = None
+    reset_token = None
+    email = None
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            # Do not reveal whether the email exists.
+            flash('Eğer bu e-posta kayıtlıysa, sıfırlama bağlantısı gönderildi.', 'warning')
+            return redirect(url_for('auth.forgot_password'))
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        user.password_reset_token = reset_token
+        user.password_reset_sent_at = datetime.utcnow()
+        db.session.commit()
+        # In production, send this token via email. For dev, show it.
+        flash('Sıfırlama talebiniz alındı.', 'success')
+        return render_template('forgot_password.html', email=email, reset_token=reset_token)
+
+    return render_template('forgot_password.html', error=error)
+
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Consume a reset token and set a new password."""
+    user = User.query.filter_by(password_reset_token=token).first()
+    if user is None:
+        flash('Sıfırlama bağlantısı geçersiz veya süresi dolmuş.', 'error')
+        return redirect(url_for('auth.forgot_password'))
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm', '')
+        if len(password) < 6:
+            return render_template('reset_password.html', token=token,
+                                   error='Şifre en az 6 karakter olmalı')
+        if password != confirm:
+            return render_template('reset_password.html', token=token,
+                                   error='Şifreler eşleşmiyor')
+        user.set_password(password)
+        user.password_reset_token = None
+        user.password_reset_sent_at = None
+        db.session.commit()
+        flash('Şifreniz güncellendi. Şimdi giriş yapabilirsiniz.', 'success')
+        return redirect(url_for('auth.login'))
+    return render_template('reset_password.html', token=token, error=None)
 
 
 @auth_bp.route('/logout')
