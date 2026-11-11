@@ -1,14 +1,14 @@
 import os
 import urllib.parse
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, g, flash
-from .models import db, User
-from .routes.dashboard import dashboard_bp
-from .routes.accounts import accounts_bp
-from .routes.transactions import transactions_bp
-from .routes.payments import payments_bp
-from .routes.debts import debts_bp
-from .routes.budgets import budgets_bp
-from .routes.discounts import discounts_bp
+from models import db, User
+from routes.dashboard import dashboard_bp
+from routes.accounts import accounts_bp
+from routes.transactions import transactions_bp
+from routes.payments import payments_bp
+from routes.debts import debts_bp
+from routes.budgets import budgets_bp
+from routes.discounts import discounts_bp
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -139,8 +139,11 @@ def create_app():
     return app
 
 
+# Module-level app instance so Gunicorn can use "personal_finance_tracker.app:app".
+app = create_app()
+
+
 if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
 
 

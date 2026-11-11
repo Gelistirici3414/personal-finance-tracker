@@ -1,6 +1,6 @@
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from ..models import db, Account
+from models import db, Account
 
 accounts_bp = Blueprint('accounts', __name__)
 

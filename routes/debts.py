@@ -1,6 +1,6 @@
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from ..models import db, UpcomingPayment, Transaction, Account
+from models import db, UpcomingPayment, Transaction, Account
 from datetime import datetime
 
 debts_bp = Blueprint('debts', __name__)

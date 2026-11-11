@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, send_file, session
 from werkzeug.utils import secure_filename
-from ..models import db, Account, Transaction
+from models import db, Account, Transaction
 
 
 transactions_bp = Blueprint('transactions', __name__)

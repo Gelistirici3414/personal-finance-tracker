@@ -1,6 +1,6 @@
 ﻿import os
 from flask import Blueprint, render_template, session
-from ..models import db, Account, Transaction, UpcomingPayment, Budget
+from models import db, Account, Transaction, UpcomingPayment, Budget
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
 
