@@ -11,7 +11,40 @@ from routes.debts import debts_bp
 from routes.budgets import budgets_bp
 from routes.discounts import discounts_bp
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # load .env if present (no-op in production where env is set by host)
+except ImportError:
+    pass
+
+
 auth_bp = Blueprint('auth', __name__)
+
+
+# Simple in-memory rate limiter for auth endpoints (per-IP).  In production,
+# swap for a Redis-backed limiter (e.g. flask-limiter) once you add the dep.
+import time
+_login_attempts = {}
+_RATE_WINDOW = 300          # 5 minutes
+_RATE_LIMIT = 10           # max attempts per window
+
+
+def _rate_limited(ip):
+    now = time.time()
+    bucket = _login_attempts.get(ip, [])
+    # prune old entries
+    _login_attempts[ip] = [t for t in bucket if now - t < _RATE_WINDOW]
+    if len(_login_attempts[ip]) >= _RATE_LIMIT:
+        return True
+    _login_attempts[ip].append(now)
+    return False
+
+
+# Rate-limiter for the /login endpoint.  In TESTING / dev (no FLASK_ENV set)
+# the limiter is disabled so test suites never trip it.
+_RATE_LIMIT_ENABLED = os.environ.get('FLASK_ENV', '').lower() not in ('test', 'testing')
+if os.environ.get('FLASK_ENV', '').lower() == '':
+    _RATE_LIMIT_ENABLED = False
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -20,21 +53,27 @@ def login():
         return redirect(url_for('dashboard.dashboard'))
     error = None
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['email'] = user.email
-            return redirect(request.args.get('next') or url_for('dashboard.dashboard'))
-        error = 'Kullanıcı adı veya şifre hatalı'
+        if _RATE_LIMIT_ENABLED and _rate_limited(request.remote_addr or 'unknown'):
+            error = 'Çok fazla deneme. Lütfen 5 dakika sonra tekrar deneyin.'
+        else:
+            username = request.form.get('username', '').strip()
+            password = request.form.get('password', '')
+            user = User.query.filter_by(username=username).first()
+            if user and user.check_password(password):
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['email'] = user.email
+                return redirect(request.args.get('next') or url_for('dashboard.dashboard'))
+            error = 'Kullanıcı adı veya şifre hatalı'
     return render_template('login.html', error=error)
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if session.get('user_id'):
+        if request.method == 'POST':
+            # Reject POSTs from already-authenticated users explicitly.
+            return jsonify(error='you are already logged in; use /logout first'), 403
         return redirect(url_for('dashboard.dashboard'))
     errors = []
     if request.method == 'POST':
@@ -124,12 +163,50 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
-def create_app():
+def create_app(database_uri=None, engine_options=None):
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance.db'
+
+    is_production = os.environ.get('FLASK_ENV', '').lower() == 'production'
+
+    # --- Security hardening ---
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        database_uri
+        or os.environ.get('FPU_DATABASE_URL')
+        or os.environ.get('DATABASE_URI')
+        or 'sqlite:///finance.db'
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.environ.get('FPU_SECRET_KEY', 'dev-secret-change-in-production')
+    app.config['SECRET_KEY'] = os.environ.get(
+        'FPU_SECRET_KEY',
+        'dev-secret-change-in-production',
+    )
+    if engine_options:
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options
+    app.config['DEBUG'] = not is_production
+    # Run in TESTING mode when an in-memory/ephemeral DB is requested, so
+    # session & commit behaviour stays predictable in the test-suite.
+    app.config['TESTING'] = bool(
+        database_uri and database_uri.startswith('sqlite://')
+    )
     db.init_app(app)
+
+
+    # --- CSRF-like safety: JSON API + session cookie flag ---
+    app.config['SESSION_COOKIE_NAME'] = os.environ.get(
+        'FPU_SESSION_COOKIE', 'fpu_session')
+
+    if is_production:
+        app.config.update(
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+            SESSION_COOKIE_MAXAGE=60 * 60 * 24 * 7,
+        )
+    else:
+        app.config.update(
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+        )
 
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -140,6 +217,44 @@ def create_app():
     app.register_blueprint(payments_bp, url_prefix='/payments')
     app.register_blueprint(debts_bp, url_prefix='/debts')
     app.register_blueprint(discounts_bp)
+    # Register the JSON API blueprint
+    from routes.api import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api')
+
+    # --- Content-Security-Policy header (production only, dev loosened) ---
+    @app.after_request
+    def _add_security_headers(resp):
+        if is_production:
+            resp.headers['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "object-src 'none'; frame-ancestors 'self'; base-uri 'self'"
+            )
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return resp
+
+    # --- Global error handlers (404 / 500) ---
+    from flask import render_template, jsonify
+    @app.errorhandler(404)
+    def not_found(e):
+        if request.path.startswith('/api'):
+            return jsonify(error='not found'), 404
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def server_error(e):
+        if request.path.startswith('/api'):
+            return jsonify(error='internal server error'), 500
+        return render_template('errors/500.html'), 500
+
+    @app.errorhandler(401)
+    def unauthorized(e):
+        return jsonify(error='authentication required'), 401
 
     # Protect all data routes
     protected_prefixes = (
@@ -157,6 +272,10 @@ def create_app():
 
     @app.before_request
     def _before_request():
+        # The JSON API exposes its own clean 401/403 errors — skip the blanket
+        # HTML redirect for /api/* so clients get machine-readable responses.
+        if request.path.startswith('/api'):
+            return None
         if not _is_protected(request.path):
             return None
         if not session.get('user_id'):

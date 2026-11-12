@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}404 — Sayfa Bulunamadı{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+    <p class="text-7xl font-bold text-green-400 mb-4">404</p>
+    <h1 class="text-2xl text-white mb-2">Bu sayfa bulunamadı</h1>
+    <p class="text-gray-400 mb-6">Aradığınız sayfa taşınmış veya silinmiş olabilir.</p>
+    <a href="{{ url_for('dashboard.dashboard') }}"
+       class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg">← Başa Dön</a>
+</div>
+{% endblock %}

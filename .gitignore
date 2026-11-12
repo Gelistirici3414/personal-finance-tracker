@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Flask / SQLAlchemy
+instance/
+*.db
+*.sqlite3
+instance/*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Databases
+*.db
+*.sqlite3
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+build/
+dist/

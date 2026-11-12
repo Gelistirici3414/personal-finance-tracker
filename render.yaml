@@ -1,0 +1,16 @@
+# Render will auto-detect Dockerfile and build it
+# If you prefer the built-in Python runtime, add this manifest instead:
+#
+# --- render.yaml (Render's service manifest) ---
+# services:
+#   - type: web
+#     name: personal-finance-tracker
+#     plan: starter
+#     runtime: python
+#     buildCommand: pip install -r requirements.txt
+#     startCommand: gunicorn wsgi:app -w 2 -b 0.0.0.0:$PORT
+#     envVars:
+#       - key: FPU_SECRET_KEY
+#         value: "set-a-strong-secret-in-the-Render-dashboard"
+#       - key: FLASK_ENV
+#         value: production

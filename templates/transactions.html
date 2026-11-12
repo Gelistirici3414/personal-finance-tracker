@@ -3,7 +3,11 @@
 
 {% block content %}
 <h2 class="text-2xl font-semibold mb-4">Hareketler</h2>
-<a href="{{ url_for('transactions.add_transaction') }}" class="inline-block mb-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Yeni Hareket Ekle</a>
+<div class="flex flex-wrap gap-3 mb-4">
+    <a href="{{ url_for('transactions.add_transaction') }}" class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Yeni Hareket Ekle</a>
+    <a href="{{ url_for('transactions.export_csv') }}?{{ request.query_string|decode_uri }}" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">CSV İndir</a>
+    <a href="{{ url_for('transactions.export_csv') }}?{{ request.query_string|decode_uri }}" class="inline-block bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold">Excel'e Aktar</a>
+</div>
 <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
     <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="p-2 bg-gray-700 rounded text-white">
     <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="p-2 bg-gray-700 rounded text-white">
@@ -21,33 +25,37 @@
     </select>
     <button type="submit" class="p-2 bg-green-600 rounded text-white">Filtrele</button>
 </form>
-<a href="{{ url_for('transactions.export_csv') }}?{{ request.query_string|decode_uri }}" class="inline-block mb-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">CSV İndir</a>
-<a href="{{ url_for('transactions.export_csv') }}?{{ request.query_string|decode_uri }}" class="inline-block mb-4 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold">Excel'e Aktar</a>
-<table class="min-w-full bg-gray-800">
+<!-- Live client-side search -->
+<input id="live-search" type="search" placeholder="Tabloda ara (hesap, kategori, açıklama...)"
+       class="w-full mb-4 p-2 bg-gray-700 rounded text-white placeholder-gray-400">
+<div id="txn-table-wrap">
+{% if transactions %}
+<table class="min-w-full bg-gray-800" id="txn-table">
     <thead>
         <tr>
-            <th class="px-4 py-2">ID</th>
-            <th class="px-4 py-2">Hesap</th>
+            <th class="px-4 py-2 cursor-pointer hover:text-green-300" data-sort="id">ID ⇅</th>
+            <th class="px-4 py-2 cursor-pointer hover:text-green-300" data-sort="name">Hesap ⇅</th>
             <th class="px-4 py-2">Tür</th>
-            <th class="px-4 py-2">Miktar</th>
-            <th class="px-4 py-2">Kategori</th>
+            <th class="px-4 py-2 cursor-pointer hover:text-green-300" data-sort="amount">Miktar ⇅</th>
+            <th class="px-4 py-2 cursor-pointer hover:text-green-300" data-sort="category">Kategori ⇅</th>
             <th class="px-4 py-2">Açıklama</th>
             <th class="px-4 py-2">Kişi</th>
-            <th class="px-4 py-2">Tarih</th>
+            <th class="px-4 py-2 cursor-pointer hover:text-green-300" data-sort="date">Tarih ⇅</th>
             <th class="px-4 py-2">İşlem</th>
         </tr>
     </thead>
     <tbody>
         {% for tr in transactions %}
-        <tr class="border-t border-gray-700">
-            <td class="px-4 py-2">{{ tr.id }}</td>
-            <td class="px-4 py-2">{{ tr.account.name }}</td>
+        <tr class="border-t border-gray-700"
+            data-search="{{ tr.account.name }} {{ tr.category }} {{ tr.description }} {{ tr.person_name }} |{{tr.id}}|{{ tr.amount }}|{{ tr.date.isoformat() }}">
+            <td class="px-4 py-2" data-v="{{ tr.id }}">{{ tr.id }}</td>
+            <td class="px-4 py-2" data-v="{{ tr.account.name }}">{{ tr.account.name }}</td>
             <td class="px-4 py-2">{{ tr.type }}</td>
-            <td class="px-4 py-2">{{ "{:,.2f}".format(tr.amount) }}₺</td>
-            <td class="px-4 py-2">{{ tr.category }}</td>
+            <td class="px-4 py-2" data-v="{{ tr.amount }}">{{ "{:,.2f}".format(tr.amount) }}₺</td>
+            <td class="px-4 py-2" data-v="{{ tr.category }}">{{ tr.category }}</td>
             <td class="px-4 py-2">{{ tr.description }}</td>
             <td class="px-4 py-2">{{ tr.person_name }}</td>
-            <td class="px-4 py-2">{{ tr.date }}</td>
+            <td class="px-4 py-2" data-v="{{ tr.date.isoformat() }}">{{ tr.date }}</td>
             <td class="px-4 py-2">
                 <a href="{{ url_for('transactions.delete_transaction', id=tr.id) }}"
                    class="text-red-400 hover:text-red-300 text-sm font-medium"
@@ -57,4 +65,47 @@
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+<div class="bg-gray-800 p-8 rounded text-center">
+    <p class="text-gray-400 mb-2">Henüz hareket yok.</p>
+    <p class="text-gray-500 text-sm">Yeni bir hesap ve hareket ekleyerek başlayın.</p>
+    <a href="{{ url_for('transactions.add_transaction') }}"
+       class="inline-block mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">İlk Hareketini Ekle</a>
+</div>
+{% endif %}
+</div>
+
+<script>
+(function(){
+  // Live search
+  var s = document.getElementById('live-search');
+  var rows = document.querySelectorAll('#txn-table tbody tr');
+  if (s && rows.length){
+    s.addEventListener('input', function(){
+      var q = s.value.trim().toLowerCase();
+      rows.forEach(function(r){
+        r.style.display = (!q || (r.getAttribute('data-search')||'').toLowerCase().indexOf(q)>=0) ? '' : 'none';
+      });
+    });
+  }
+  // Column sort (asc/desc toggle)
+  document.querySelectorAll('#txn-table thead th[data-sort]').forEach(function(th){
+    th.addEventListener('click', function(){
+      var tbody = document.querySelector('#txn-table tbody');
+      var dir = th.getAttribute('data-dir') === 'asc' ? -1 : 1;
+      document.querySelectorAll('#txn-table thead th').forEach(function(h){h.removeAttribute('data-dir');});
+      th.setAttribute('data-dir', dir===1?'asc':'desc');
+      var cells = Array.from(tbody.rows);
+      cells.sort(function(a,b){
+        var av = (a.cells[th.cellIndex].dataset.v||'').trim();
+        var bv = (b.cells[th.cellIndex].dataset.v||'').trim();
+        var an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) return (an-bn)*dir;
+        return av.localeCompare(bv)*dir;
+      });
+      cells.forEach(function(r){ tbody.appendChild(r); });
+    });
+  });
+})();
+</script>
 {% endblock %}
