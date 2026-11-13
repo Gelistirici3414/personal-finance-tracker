@@ -2,7 +2,7 @@
 <html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Kişisel Finans Takip{% endblock %}</title>
     <!-- PWA manifest + theme -->
     <link rel="manifest" href="{{ url_for('manifest_json') }}">
@@ -15,6 +15,10 @@
     <style>
         .toast { transition: opacity .3s, transform .3s; }
         .toast.hide { opacity: 0; transform: translateY(12px); }
+        /* Prevent vertical overflow on dashboard charts */
+        canvas { max-height: 100% !important; }
+        /* Ensure safe area for mobile notch/home indicator */
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
@@ -52,39 +56,69 @@
                 {% endif %}
             </div>
 
-            <!-- Mobile hamburger toggle -->
+            <!-- Mobile hamburger toggle (more prominent) -->
             <button id="mobile-menu-btn" aria-label="Menüyü aç/kapat"
-                    class="ml-auto md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+                    class="md:hidden inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gray-700 hover:bg-gray-600 text-white shadow-lg border border-gray-600 active:scale-95 transition-transform"
                     onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
             </button>
         </div>
 
         <!-- Mobile dropdown menu -->
-        <div id="mobile-menu" class="hidden md:hidden mt-4 pt-4 border-t border-gray-700">
-            <ul class="flex flex-wrap gap-2">
+        <div id="mobile-menu" class="hidden md:hidden mt-3 bg-gray-800 mx-2 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
+            <ul class="flex flex-col gap-1 p-2">
                 {% if is_logged_in %}
-                <li><a href="{{ url_for('dashboard.dashboard') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Dashboard</a></li>
-                <li><a href="{{ url_for('accounts.list_accounts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Hesaplar</a></li>
-                <li><a href="{{ url_for('transactions.list_transactions') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Hareketler</a></li>
-                <li><a href="{{ url_for('payments.list_payments') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Ödemeler</a></li>
-                <li><a href="{{ url_for('debts.list_debts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Borçlar</a></li>
-                <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Bütçeler</a></li>
-                <li><a href="{{ url_for('discounts.discounts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">İndirimler</a></li>
-                <li><a href="{{ url_for('promo.promotions') }}" class="px-4 py-2 rounded-lg text-sm bg-pink-700 hover:bg-pink-600 text-white transition w-full text-center">Aktüel</a></li>
-                <li><a href="{{ url_for('receipt.receipts_page') }}" class="px-4 py-2 rounded-lg text-sm bg-purple-700 hover:bg-purple-600 text-white transition w-full text-center">Akıllı Giriş</a></li>
-                {% endif %}
-                {% if is_logged_in %}
-                <li><a href="{{ url_for('auth.logout') }}" class="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-700 text-white transition w-full text-center">Çıkış</a></li>
+                <li><a href="{{ url_for('dashboard.dashboard') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if request.path == '/' %}✓ {% endif %}Dashboard</a></li>
+                <li><a href="{{ url_for('accounts.list_accounts') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/accounts' in request.path %}✓ {% endif %}Hesaplar</a></li>
+                <li><a href="{{ url_for('transactions.list_transactions') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/transactions' in request.path %}✓ {% endif %}Hareketler</a></li>
+                <li><a href="{{ url_for('payments.list_payments') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/payments' in request.path %}✓ {% endif %}Ödemeler</a></li>
+                <li><a href="{{ url_for('debts.list_debts') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/debts' in request.path %}✓ {% endif %}Borçlar</a></li>
+                <li><a href="{{ url_for('budgets.list_budgets') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/budgets' in request.path %}✓ {% endif %}Bütçeler</a></li>
+                <li><a href="{{ url_for('discounts.discounts') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/discounts' in request.path %}✓ {% endif %}İndirimler</a></li>
+                <li><a href="{{ url_for('promo.promotions') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-pink-700 hover:bg-pink-600 text-white transition">{% if '/promotions' in request.path %}✓ {% endif %}Aktüel</a></li>
+                <li><a href="{{ url_for('receipt.receipts_page') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-purple-700 hover:bg-purple-600 text-white transition">{% if '/receipts' in request.path %}✓ {% endif %}Akıllı Giriş</a></li>
+                <li class="border-t border-gray-600 my-1"></li>
+                <li><a href="{{ url_for('auth.logout') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">Çıkış Yap</a></li>
                 {% else %}
-                <li><a href="{{ url_for('auth.login') }}" class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white transition w-full text-center">Giriş</a></li>
+                <li><a href="{{ url_for('auth.login') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition">Giriş Yap</a></li>
+                <li><a href="{{ url_for('auth.register') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition">Kayıt Ol</a></li>
                 {% endif %}
             </ul>
         </div>
     </nav>
-    <main class="flex-1 container mx-auto p-4">
+
+    <!-- Fixed Bottom Navigation for Mobile -->
+    {% if is_logged_in %}
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-2 py-2 z-40">
+        <div class="flex justify-around items-center">
+            <a href="{{ url_for('dashboard.dashboard') }}" class="flex flex-col items-center p-2 {{ 'text-green-400' if request.path == '/' else 'text-gray-400' }} hover:text-green-300 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span class="text-xs mt-1">Ana Sayfa</span>
+            </a>
+            <a href="{{ url_for('transactions.list_transactions') }}" class="flex flex-col items-center p-2 {{ 'text-green-400' if '/transactions' in request.path else 'text-gray-400' }} hover:text-green-300 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                <span class="text-xs mt-1">Hareketler</span>
+            </a>
+            <a href="{{ url_for('accounts.list_accounts') }}" class="flex flex-col items-center p-2 {{ 'text-green-400' if '/accounts' in request.path else 'text-gray-400' }} hover:text-green-300 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                <span class="text-xs mt-1">Hesaplar</span>
+            </a>
+            <a href="{{ url_for('receipt.receipts_page') }}" class="flex flex-col items-center p-2 {{ 'text-green-400' if '/receipts' in request.path else 'text-gray-400' }} hover:text-green-300 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-xs mt-1">Fiş</span>
+            </a>
+            <a href="{{ url_for('budgets.list_budgets') }}" class="flex flex-col items-center p-2 {{ 'text-green-400' if '/budgets' in request.path else 'text-gray-400' }} hover:text-green-300 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span class="text-xs mt-1">Bütçe</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Main content with padding for bottom nav on mobile -->
+    <main class="flex-1 container mx-auto p-4 pb-24 md:pb-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
