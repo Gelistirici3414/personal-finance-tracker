@@ -6,6 +6,10 @@ python-dotenv
 APScheduler
 requests
 beautifulsoup4
+# PostgreSQL support for Render production DB
+psycopg2-binary
+# Optional: Email sending (forgot-password reset) — comment out if unused
+Flask-Mail
 # Optional: real OCR for receipt scanning.
 # pytesseract + Pillow: OCR on images (needs Tesseract OCR binary installed)
 # PyPDF2: text extraction from PDF receipts

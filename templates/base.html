@@ -40,7 +40,6 @@
                 <li><a href="{{ url_for('debts.list_debts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Borçlar</a></li>
                 <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Bütçeler</a></li>
                 <li><a href="{{ url_for('discounts.discounts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">İndirimler</a></li>
-                <li><a href="{{ url_for('promo.promotions') }}" class="px-3 py-1.5 rounded-full text-sm bg-pink-700 hover:bg-pink-600 hover:text-white transition">Aktüel</a></li>
                 <li><a href="{{ url_for('receipt.receipts_page') }}" class="px-3 py-1.5 rounded-full text-sm bg-purple-700 hover:bg-purple-600 hover:text-white transition">Akıllı Giriş</a></li>
                 {% endif %}
             </ul>
@@ -77,7 +76,6 @@
                 <li><a href="{{ url_for('debts.list_debts') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/debts' in request.path %}✓ {% endif %}Borçlar</a></li>
                 <li><a href="{{ url_for('budgets.list_budgets') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/budgets' in request.path %}✓ {% endif %}Bütçeler</a></li>
                 <li><a href="{{ url_for('discounts.discounts') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-gray-700 hover:bg-green-600 text-white transition">{% if '/discounts' in request.path %}✓ {% endif %}İndirimler</a></li>
-                <li><a href="{{ url_for('promo.promotions') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-pink-700 hover:bg-pink-600 text-white transition">{% if '/promotions' in request.path %}✓ {% endif %}Aktüel</a></li>
                 <li><a href="{{ url_for('receipt.receipts_page') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-purple-700 hover:bg-purple-600 text-white transition">{% if '/receipts' in request.path %}✓ {% endif %}Akıllı Giriş</a></li>
                 <li class="border-t border-gray-600 my-1"></li>
                 <li><a href="{{ url_for('auth.logout') }}" class="block px-4 py-3 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">Çıkış Yap</a></li>

@@ -5,8 +5,7 @@ from .payments import payments_bp
 from .debts import debts_bp
 from .budgets import budgets_bp
 from .discounts import discounts_bp
-from .promotions import promo_bp
 from .receipts import receipt_bp
 
 __all__ = ['dashboard_bp', 'accounts_bp', 'transactions_bp', 'payments_bp',
-           'debts_bp', 'budgets_bp', 'discounts_bp', 'promo_bp', 'receipt_bp']
+           'debts_bp', 'budgets_bp', 'discounts_bp', 'receipt_bp']

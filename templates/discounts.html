@@ -1,48 +1,77 @@
 {% extends "base.html" %}
-{% block title %}İndirimler - Kişisel Finans Takip{% endblock %}
+{% block title %}İndirimler ve Aktüel Fırsatlar{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-2">Market Fırsatları &amp; Broşür İndirimleri</h1>
-<p class="text-gray-400 mb-6">BİM, A101, ŞOK ve Migros'un güncel kampanya ve broşür fırsatlarını tek sayfada görüntüleyin.</p>
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h2 class="text-2xl font-semibold">İndirimler ve Aktüel Fırsatlar</h2>
+    <div class="flex gap-2">
+        {% if is_scraping %}
+        <span class="text-xs text-green-400 px-3 py-1 rounded bg-green-900/40">Arka plan tarama aktif</span>
+        {% endif %}
+        <button onclick="refreshDeals()" class="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition">Yenile</button>
+    </div>
+</div>
 
-<!-- Search + Filter -->
-<form method="GET" action="{{ url_for('discounts.discounts') }}" class="flex flex-col md:flex-row gap-3 mb-6">
-    <input type="text" name="search" value="{{ search }}" placeholder="Ürün veya market ara..."
-           class="w-full md:w-64 p-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500">
-    <button type="submit" class="p-2 bg-green-600 hover:bg-green-700 text-white rounded">Ara</button>
-    {% if active_market or search %}
-    <a href="{{ url_for('discounts.discounts') }}" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded">Temizle</a>
-    {% endif %}
+<form method="GET" action="{{ url_for('discounts.discounts') }}" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <select name="market" class="p-2 bg-gray-700 rounded text-white">
+        <option value="">Tüm Marketler</option>
+        {% for m in markets %}
+        <option value="{{ m }}" {% if active_market == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="search" value="{{ search }}" placeholder="Ürün veya market ara…"
+           class="p-2 bg-gray-700 rounded text-white placeholder-gray-400">
+    <button type="submit" class="col-span-2 md:col-span-1 p-2 bg-green-600 rounded text-white">Filtrele</button>
+    {% if active_market or search %}<a href="{{ url_for('discounts.discounts') }}" class="p-2 bg-gray-700 rounded text-white text-center">Temizle</a>{% endif %}
 </form>
 
-<!-- Market Tabs -->
 <div class="flex gap-2 mb-6 flex-wrap">
-    <a href="{{ url_for('discounts.discounts') }}" class="px-3 py-1 rounded {{ 'bg-green-600 text-white' if not active_market else 'bg-gray-800 text-gray-300 hover:bg-gray-700' }}">Tümü</a>
+    <a href="{{ url_for('discounts.discounts') }}"
+       class="px-3 py-1 rounded text-sm {{ 'bg-green-600 text-white' if not active_market else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">Tümü</a>
     {% for m in markets %}
-    <a href="{{ url_for('discounts.discounts', market=m) }}" class="px-3 py-1 rounded {{ 'bg-green-600 text-white' if active_market == m else 'bg-gray-800 text-gray-300 hover:bg-gray-700' }}">{{ m }}</a>
+    <a href="{{ url_for('discounts.discounts', market=m) }}"
+       class="px-3 py-1 rounded text-sm {{ 'bg-green-600 text-white' if active_market == m else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">{{ m }}</a>
     {% endfor %}
 </div>
 
-<!-- Deals Grid -->
 {% if deals %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for d in deals %}
-    <div class="bg-gray-800 p-5 rounded-lg shadow hover:shadow-lg transition">
-        <div class="flex justify-between items-start mb-3">
-            <span class="text-xs font-bold px-2 py-1 rounded bg-gray-700 text-gray-300">{{ d.market }}</span>
-            <span class="text-green-400 font-bold text-lg">{{ d.discount }}</span>
+    {% set is_obj = d.__class__.__name__ == 'PromoDeal' %}
+    {% set product  = d.product  if is_obj else d.get('product', '') %}
+    {% set market   = d.market   if is_obj else d.get('market', '') %}
+    {% set price    = d.price    if is_obj else d.get('price') %}
+    {% set discount = d.discount_pct if is_obj else d.get('discount_pct') %}
+    {% set img      = d.image_url if is_obj else d.get('image_url') %}
+    {% set scraped  = d.scraped_at if is_obj else d.get('scraped_at') %}
+    <div class="bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition">
+        <div class="flex justify-between items-start mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ market }}</span>
+            {% if discount %}<span class="text-green-400 font-bold">-%{{ '%.0f'|format(discount) }}</span>{% endif %}
         </div>
-        <h3 class="text-lg font-semibold text-white mb-1">{{ d.product }}</h3>
-        <p class="text-gray-400 text-sm mb-3">Kaynak: {{ d.brochure }}</p>
-        {% if d.price and d.price != '-' %}
-        <p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ d.price }}</span></p>
+        {% if img %}<img src="{{ img }}" alt="{{ product }}" loading="lazy"
+             class="w-full h-32 object-cover rounded mb-3">{% endif %}
+        <h3 class="text-base font-semibold text-white mb-1">{{ product }}</h3>
+        {% if price is not none %}<p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ "{:,.2f}".format(price) }}₺</span></p>
+        {% elif d.get('note') %}<p class="text-yellow-300 text-sm">{{ d.note }}</p>
+        {% else %}<p class="text-gray-500 text-sm">Fiyat katalogda belirtilmiştir</p>
         {% endif %}
+        {% if scraped %}<p class="text-gray-500 text-xs mt-2">📅 {{ scraped.strftime('%d.%m.%Y %H:%M') }}</p>{% endif %}
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="bg-gray-800 p-10 text-center rounded-lg">
-    <p class="text-gray-400 text-lg">Eşleşen indirim bulunamadı.</p>
+<div class="bg-gray-800 p-8 rounded text-center">
+    <p class="text-gray-400 mb-2">Henüz tarama yapılmamış fırsat bulunamadı.</p>
+    <p class="text-gray-500 text-xs">Arka plan servisini çalıştırın: <code class="text-green-400">python run_scheduler.py --once</code></p>
 </div>
 {% endif %}
+
+<script>
+function refreshDeals(){
+    fetch('/api/discounts/refresh', {method:'POST', credentials:'same-origin'})
+     .then(r=>r.json()).then(d=>{ alert('Yenilendi: '+JSON.stringify(d.scraped)); location.reload(); })
+     .catch(e=>alert('Yenileme hatası: '+e));
+}
+</script>
 {% endblock %}

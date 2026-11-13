@@ -1,4 +1,5 @@
 import os
+import logging
 import urllib.parse
 from datetime import datetime
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, g, flash
@@ -10,13 +11,21 @@ from routes.payments import payments_bp
 from routes.debts import debts_bp
 from routes.budgets import budgets_bp
 from routes.discounts import discounts_bp
-from routes.promotions import promo_bp
 from routes.receipts import receipt_bp
 
 try:
     from dotenv import load_dotenv
     load_dotenv()  # load .env if present (no-op in production where env is set by host)
 except ImportError:
+    pass
+
+
+# Optional: Flask-Mail for password-reset emails
+MAIL_SUPPORTED = False
+try:
+    from flask_mail import Mail, Message
+    MAIL_SUPPORTED = True
+except Exception:
     pass
 
 
@@ -104,6 +113,40 @@ def register():
     return render_template('register.html', errors=errors)
 
 
+def _send_reset_email(to_email: str, token: str) -> bool:
+    """Attempt to send a password-reset email via Flask-Mail.
+
+    Returns True on success, False if mail is not configured or sending failed.
+    In all error cases logs the exception but never raises so the reset flow
+    continues (token is still stored in DB).
+    """
+    if not MAIL_SUPPORTED:
+        return False
+    try:
+        from app import current_app as _app  # noqa — avoid circular at module level
+        mail = getattr(_app, '_mail', None)
+        if mail is None:
+            return False
+        base_url = request.host_url.rstrip('/')
+        link = f"{base_url}{url_for('auth.reset_password', token=token, _external=False)}"
+        subject = "[Kişisel Finans Takip] Şifre Sıfırlama Talebi"
+        body = (
+            f"Merhaba,\n\n"
+            f"Şifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanın:\n"
+            f"{link}\n\n"
+            f"Bu bağlantı 1 saat geçerlidir. Eğer bu talebi siz yapmadıysanız "
+            f"bu e-postayı görmezden gelebilirsiniz.\n\n"
+            f"--\nKişisel Finans Takip"
+        )
+        msg = Message(subject=subject, recipients=[to_email], body=body)
+        mail.send(msg)
+        logging.getLogger(__name__).info("Reset email sent to %s", to_email)
+        return True
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to send reset email to %s", to_email)
+        return False
+
+
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     """Simple password-reset request infrastructure.
@@ -127,7 +170,9 @@ def forgot_password():
         user.password_reset_token = reset_token
         user.password_reset_sent_at = datetime.utcnow()
         db.session.commit()
-        # In production, send this token via email. For dev, show it.
+        # Attempt to send reset email; fall back gracefully if mail is
+        # unavailable or SMTP fails so users are never blocked.
+        _send_reset_email(user.email, reset_token)
         flash('Sıfırlama talebiniz alındı.', 'success')
         return render_template('forgot_password.html', email=email, reset_token=reset_token)
 
@@ -171,12 +216,16 @@ def create_app(database_uri=None, engine_options=None):
     is_production = os.environ.get('FLASK_ENV', '').lower() == 'production'
 
     # --- Security hardening ---
-    app.config['SQLALCHEMY_DATABASE_URI'] = (
+    raw_uri = (
         database_uri
         or os.environ.get('FPU_DATABASE_URL')
         or os.environ.get('DATABASE_URI')
         or 'sqlite:///finance.db'
     )
+    # Normalize postgres:// → postgresql:// for SQLAlchemy compatibility.
+    if raw_uri.startswith('postgres://'):
+        raw_uri = raw_uri.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = raw_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.environ.get(
         'FPU_SECRET_KEY',
@@ -191,6 +240,20 @@ def create_app(database_uri=None, engine_options=None):
         database_uri and database_uri.startswith('sqlite://')
     )
     db.init_app(app)
+
+    # Initialize Flask-Mail if configured (SMTP env vars must be set).
+    if MAIL_SUPPORTED:
+        app.config.update(
+            MAIL_SERVER=os.environ.get('FPU_SMTP_HOST', 'smtp.gmail.com'),
+            MAIL_PORT=int(os.environ.get('FPU_SMTP_PORT', 587)),
+            MAIL_USE_TLS=True,
+            MAIL_USERNAME=os.environ.get('FPU_SMTP_USER', ''),
+            MAIL_PASSWORD=os.environ.get('FPU_SMTP_PASS', ''),
+            MAIL_DEFAULT_SENDER=os.environ.get(
+                'FPU_EMAIL_FROM', os.environ.get('FPU_SMTP_USER', 'noreply@localhost')),
+        )
+        mail = Mail(app)
+        app._mail = mail  # expose for _send_reset_email lookup
 
 
     # --- CSRF-like safety: JSON API + session cookie flag ---
@@ -222,7 +285,6 @@ def create_app(database_uri=None, engine_options=None):
     # Register the JSON API blueprint
     from routes.api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(promo_bp)
     app.register_blueprint(receipt_bp)
 
     # --- Content-Security-Policy header (production only, dev loosened) ---
@@ -263,7 +325,7 @@ def create_app(database_uri=None, engine_options=None):
     # Protect all data routes
     protected_prefixes = (
         '/accounts', '/transactions', '/payments', '/debts', '/budgets',
-        '/discounts', '/promotions', '/receipts',
+        '/discounts', '/receipts',
     )
     protected_rules = ['/']
 

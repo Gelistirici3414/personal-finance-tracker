@@ -40,13 +40,15 @@ def test_dashboard_no_alert_when_within_budget(client, app, user):
     assert 'Bütçe Aşımı' not in text
 
 
-def test_promotions_page_renders(client, app, user):
-    r = client.get('/promotions')
+def test_discounts_page_renders(client, app, user):
+    r = client.get('/discounts')
     assert r.status_code == 200
-    assert 'Aktüel Fırsatlar' in r.get_data(as_text=True)
+    text = r.get_data(as_text=True)
+    # Should show either scraped deals or mock fallback content.
+    assert 'İndirimler' in text or 'Fırsatlar' in text or 'Henüz tarama' in text
 
 
-def test_api_promotions_requires_login(client):
+def test_api_discounts_requires_login(client):
     fresh = client.application.test_client()
-    r = fresh.get('/api/promotions')
+    r = fresh.get('/api/discounts')
     assert r.status_code == 401
