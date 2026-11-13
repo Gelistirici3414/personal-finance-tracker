@@ -23,6 +23,22 @@
 </div>
 {% endif %}
 
+<!-- Over-budget alerts (inline banner + auto-dismissing toast) -->
+{% if over_budget_alerts %}
+<div class="bg-red-900/40 border border-red-600 rounded-lg p-4 mb-8">
+    <h2 class="text-lg font-semibold text-red-300 mb-2">⚠️ Bütçe Aşımı Uyarısı</h2>
+    <ul class="space-y-2">
+        {% for a in over_budget_alerts %}
+        <li class="text-gray-200 text-sm">
+            <span class="font-semibold text-red-300">{{ a.category }}</span>
+            bütçesini <span class="font-bold text-red-300">{{ "{:,.2f}".format(a.over_by) }}₺</span> aştı
+            ({{ "{:,.2f}".format(a.spent) }} / {{ "{:,.2f}".format(a.limit) }}₺)
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <div class="bg-gray-800 p-6 rounded shadow">
         <h3 class="text-lg font-medium text-gray-400">Toplam Bakiye</h3>
@@ -43,16 +59,22 @@
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <!-- Pie Chart: Spending by Category -->
+    <!-- Doughnut: Spending by Category -->
     <div class="bg-gray-800 p-6 rounded shadow">
         <h2 class="text-xl font-semibold mb-4">Harcama Kategorileri (Bu Ay)</h2>
         <canvas id="spendingPieChart" height="300"></canvas>
     </div>
-    <!-- Line Chart: Balance Trend -->
+    <!-- Line: Balance Trend -->
     <div class="bg-gray-800 p-6 rounded shadow">
         <h2 class="text-xl font-semibold mb-4">Bakiye Trendi (Son 6 Ay)</h2>
         <canvas id="balanceLineChart" height="300"></canvas>
     </div>
+</div>
+
+<!-- Bar: Monthly spending -->
+<div class="bg-gray-800 p-6 rounded shadow mb-8">
+    <h2 class="text-xl font-semibold mb-4">Aylık Harcama (Son 6 Ay)</h2>
+    <canvas id="monthlyBarChart" height="250"></canvas>
 </div>
 
 <!-- AI Insights -->
@@ -73,13 +95,16 @@
     <h2 class="text-2xl font-semibold mb-4">Kategoriler için Bütçe Durumu</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for b in budget_info %}
-        <div class="bg-gray-800 p-4 rounded shadow">
-            <div class="flex justify-between mb-2">
-                <span>{{ b.category }}</span>
-                <span class="text-gray-400">{{ "{:,.2f}".format(b.spent) }} / {{ "{:,.2f}".format(b.limit) }}₺</span>
+        <div class="bg-gray-800 p-4 rounded shadow {{ 'ring-2 ring-red-500/60' if b.over }}">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold">{{ b.category }}
+                    {% if b.over %}<span class="ml-1 text-xs text-red-400 font-bold">AŞILDI</span>{% endif %}
+                </span>
+                <span class="text-gray-400 text-xs">{{ "{:,.2f}".format(b.spent) }} / {{ "{:,.2f}".format(b.limit) }}₺</span>
             </div>
             <div class="w-full bg-gray-700 rounded h-4">
-                <div class="h-4 rounded" style="width: {{ b.percent }}%; background-color: {{ '#ef4444' if b.percent > 100 else '#34d399' }};"></div>
+                <div class="h-4 rounded"
+                     style="width: {{ [b.percent, 100]|min }}%; background-color: {{ '#ef4444' if b.over else '#34d399' }};"></div>
             </div>
         </div>
         {% endfor %}
@@ -91,54 +116,69 @@
 
 {% block scripts %}
 <script>
-    // Data from Flask
-    const categories = {{ categories|tojson }};
-    const amounts = {{ amounts|tojson }};
-    const trendLabels = {{ trend_labels|tojson }};
-    const trendData = {{ trend_data|tojson }};
+    const categories   = {{ categories|tojson }};
+    const amounts      = {{ amounts|tojson }};
+    const trendLabels  = {{ trend_labels|tojson }};
+    const trendData    = {{ trend_data|tojson }};
 
-    // Pie Chart
+    const chartColors = ['#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa',
+                         '#f472b6', '#34d399', '#fb923c'];
+
+    // Doughnut: spending by category (this month)
     new Chart(document.getElementById('spendingPieChart'), {
         type: 'doughnut',
-        data: {
-            labels: categories,
-            datasets: [{
-                data: amounts,
-                backgroundColor: [
-                    '#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa', '#f472b6', '#34d399', '#fb923c'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'right', labels: { color: '#e5e7eb' } }
-            }
-        }
+        data: { labels: categories,
+                datasets: [{ data: amounts, backgroundColor: chartColors }] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { color: '#e5e7eb' } } } }
     });
 
-    // Line Chart
+    // Line: 6-month balance trend
     new Chart(document.getElementById('balanceLineChart'), {
         type: 'line',
-        data: {
-            labels: trendLabels,
-            datasets: [{
-                label: 'Net Bakiye',
-                data: trendData,
-                borderColor: '#34d399',
-                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                fill: true,
-                tension: 0.3
-            }]
-        },
-        options: {
-            responsive: true,
+        data: { labels: trendLabels,
+                datasets: [{ label: 'Net Bakiye', data: trendData,
+                             borderColor: '#34d399',
+                             backgroundColor: 'rgba(52,211,153,0.1)',
+                             fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false,
             plugins: { legend: { labels: { color: '#e5e7eb' } } },
-            scales: {
-                x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-                y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
-            }
-        }
+            scales: { x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                      y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } } }
     });
+
+    // Bar: monthly spending (last 6 months; negative values = spending)
+    const spendData = trendData.map(v => -v);
+    new Chart(document.getElementById('monthlyBarChart'), {
+        type: 'bar',
+        data: { labels: trendLabels,
+                datasets: [{ label: 'Harcama', data: spendData,
+                             backgroundColor: spendData.map(v => v < 0 ? '#f87171' : '#34d399'),
+                             borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#e5e7eb' } } },
+            scales: { x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                      y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } } }
+    });
+
+    // Auto-dismissing toast for over-budget alerts
+    {% if over_budget_alerts %}
+    (function(){
+        var container = document.getElementById('toast-container');
+        if (!container) return;
+        var msgs = {{ over_budget_alerts|tojson }};
+        msgs.forEach(function(a){
+            var t = document.createElement('div');
+            t.className = 'toast px-4 py-2 rounded shadow text-white text-sm bg-red-600';
+            t.textContent = 'Bütçe aşıldı: ' + a.category + ' — ' +
+                a.over_by.toFixed(2) + '₺ fazla harcama';
+            container.appendChild(t);
+            setTimeout(function(){
+                t.classList.add('hide');
+                setTimeout(function(){ t.remove(); }, 350);
+            }, 6000);
+        });
+    })();
+    {% endif %}
 </script>
 {% endblock %}

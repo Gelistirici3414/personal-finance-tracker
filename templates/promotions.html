@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Aktüel Fırsatlar{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h2 class="text-2xl font-semibold">Aktüel Fırsatlar</h2>
+    <div class="flex gap-2">
+        {% if is_scraping %}
+        <span class="text-xs text-green-400 px-3 py-1 rounded bg-green-900/40">Arka plan tarama aktif</span>
+        {% endif %}
+        <button onclick="document.getElementById('refresh-btn').click()"
+                class="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white">
+            Yenile
+        </button>
+        <button id="refresh-btn" style="display:none"
+                class="text-xs px-3 py-1 rounded bg-blue-600 text-white"
+                onclick="fetch('{{ url_for('promo.api_refresh') }}', {method:'POST'})
+                       .then(r=>r.json())
+                       .then(d=>{alert('Yenilendi: '+JSON.stringify(d.scraped));location.reload()})
+                       .catch(e=>alert('Yenileme hatası: '+e))"></button>
+    </div>
+</div>
+
+<form method="GET" action="{{ url_for('promo.promotions') }}" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <select name="market" class="p-2 bg-gray-700 rounded text-white">
+        <option value="">Tüm Marketler</option>
+        {% for m in markets %}
+        <option value="{{ m }}" {% if active_market == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="search" value="{{ search }}" placeholder="Ürün veya market ara…"
+           class="p-2 bg-gray-700 rounded text-white placeholder-gray-400">
+    <button type="submit" class="col-span-2 md:col-span-1 p-2 bg-green-600 rounded text-white">Filtrele</button>
+    {% if active_market or search %}
+    <a href="{{ url_for('promo.promotions') }}" class="p-2 bg-gray-700 rounded text-white text-center">Temizle</a>
+    {% endif %}
+</form>
+
+{% if deals %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for d in deals %}
+    <div class="bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition">
+        <div class="flex justify-between items-start mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ d.market }}</span>
+            {% if d.discount_pct %}
+            <span class="text-green-400 font-bold">-%{{ '%.0f'|format(d.discount_pct) }}</span>
+            {% endif %}
+        </div>
+        {% if d.image_url %}
+        <img src="{{ d.image_url }}" alt="{{ d.product }}" loading="lazy"
+             class="w-full h-32 object-cover rounded mb-3">
+        {% endif %}
+        <h3 class="text-base font-semibold text-white mb-1">{{ d.product }}</h3>
+        {% if d.price %}
+        <p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ '{:,.2f}'.format(d.price) }}₺</span></p>
+        {% endif %}
+        <p class="text-gray-500 text-xs mt-2">{{ d.scraped_at.strftime('%d.%m.%Y %H:%M') }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-gray-800 p-8 rounded text-center">
+    <p class="text-gray-400 mb-2">Henüz tarama yapılmamış fırsat bulunamadı.</p>
+    <p class="text-gray-500 text-xs">Arka plan servisini çalıştırın: <code class="text-green-400">python run_scheduler.py --once</code></p>
+</div>
+{% endif %}
+{% endblock %}

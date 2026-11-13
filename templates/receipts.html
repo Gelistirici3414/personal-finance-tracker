@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Akıllı Veri Girişi{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Akıllı Veri Girişi</h2>
+{% if not ocr_available %}
+<div class="bg-yellow-900/40 border border-yellow-600 text-yellow-200 rounded p-3 mb-4 text-sm">
+    OCR servisi aktif değil. <code>pip install pytesseract pillow</code> kurarak fiş fotoğrafı taramasını etkinleştirebilirsiniz.
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Receipt OCR -->
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-semibold mb-3 text-white">Fiş Yükle (OCR)</h3>
+        <form id="receipt-form" method="POST" action="{{ url_for('receipt.upload_receipt') }}"
+              enctype="multipart/form-data" class="space-y-3">
+            <div>
+                <label class="block text-gray-300 mb-1">Fiş dosyası (jpg/png/pdf)</label>
+                <input type="file" name="receipt_file" accept="image/*,application/pdf" required
+                       class="w-full text-white bg-gray-700 rounded p-2">
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-1">Hesap</label>
+                <select name="account_id" required class="w-full bg-gray-700 rounded p-2 text-white">
+                    <option value="" disabled seçin>…</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded">Tara &amp; Kaydet</button>
+        </form>
+        <div id="receipt-result" class="mt-3 text-sm text-gray-400 hidden"></div>
+    </div>
+
+    <!-- Bank SMS -->
+    <div class="bg-gray-800 p-6 rounded shadow">
+        <h3 class="text-lg font-semibold mb-3 text-white">Banka SMS Analizi</h3>
+        <textarea id="sms-text" rows="4" placeholder="Banka SMS'i yapıştırın…"
+                  class="w-full bg-gray-700 rounded p-2 text-white"></textarea>
+        <div class="flex gap-2 mt-2">
+            <button onclick="previewSms()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">Analiz Et</button>
+            <button onclick="commitSms()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded">Hareket Olarak Kaydet</button>
+        </div>
+        <div id="sms-result" class="mt-3 text-sm text-gray-400"></div>
+    </div>
+</div>
+
+<script>
+function previewSms(){
+  const msg = document.getElementById('sms-text').value;
+  fetch('{{ url_for("receipt.api_parse_sms") }}?message=' + encodeURIComponent(msg), {headers:{'Accept':'application/json'}})
+    .then(r=>r.json())
+    .then(d=>{ document.getElementById('sms-result').textContent = JSON.stringify(d, null, 2); });
+}
+function commitSms(){
+  const msg = document.getElementById('sms-text').value;
+  fetch('{{ url_for("receipt.api_parse_sms") }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: msg, commit: true})
+  }).then(r=>r.json()).then(d=>{
+    document.getElementById('sms-result').textContent =
+      (d.ok ? 'Hareket kaydedildi (id '+d.transaction_id+')' : (d.error||JSON.stringify(d)));
+  }).catch(e=>{ document.getElementById('sms-result').textContent = 'Hata: '+e; });
+}
+// Intercept the receipt form to show JSON result inline.
+document.getElementById('receipt-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const fd = new FormData(this);
+  fetch(this.action, {method:'POST', body: fd})
+    .then(r=>r.json().then(d=>({status:r.status, d})))
+    .then(({status, d})=>{
+      const el = document.getElementById('receipt-result');
+      el.classList.remove('hidden');
+      el.innerHTML = d.ok
+        ? '<span class="text-green-400">✅ Hareket kaydedildi: '+d.category+' — '+d.amount+'₺ ('+d.account+')</span>'
+        : '<span class="text-yellow-400">⚠️ '+(d.message||'OCR tamamlanamadı')+ (d.ocr_text ? '<pre class="text-xs text-gray-500">'+d.ocr_text.slice(0,200)+'</pre>' : '') +'</span>';
+    }).catch(err=>{ document.getElementById('receipt-result').textContent='Hata: '+err; });
+});
+</script>
+{% endblock %}

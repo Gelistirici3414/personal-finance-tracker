@@ -65,6 +65,7 @@ def dashboard():
 
     budgets = Budget.query.filter_by(user_id=uid, month=month_start).all()
     budget_info = []
+    over_budget_alerts = []
     for b in budgets:
         spent = db.session.query(func.sum(Transaction.amount)).filter(
             Transaction.user_id == uid,
@@ -79,7 +80,15 @@ def dashboard():
             'limit': b.limit_amount,
             'spent': spent,
             'percent': percent,
+            'over': percent > 100,
         })
+        if percent > 100:
+            over_budget_alerts.append({
+                'category': b.category,
+                'limit': b.limit_amount,
+                'spent': spent,
+                'over_by': spent - b.limit_amount,
+            })
 
     prev_month_end = month_start - timedelta(days=1)
     prev_month_start = date(prev_month_end.year, prev_month_end.month, 1)
@@ -136,4 +145,5 @@ def dashboard():
                            trend_labels=labels, trend_data=balance_trend,
                            budget_info=budget_info,
                            insights=insights,
-                           due_soon=due_soon)
+                           due_soon=due_soon,
+                           over_budget_alerts=over_budget_alerts)

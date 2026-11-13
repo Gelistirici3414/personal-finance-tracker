@@ -10,6 +10,8 @@ from routes.payments import payments_bp
 from routes.debts import debts_bp
 from routes.budgets import budgets_bp
 from routes.discounts import discounts_bp
+from routes.promotions import promo_bp
+from routes.receipts import receipt_bp
 
 try:
     from dotenv import load_dotenv
@@ -220,6 +222,8 @@ def create_app(database_uri=None, engine_options=None):
     # Register the JSON API blueprint
     from routes.api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(promo_bp)
+    app.register_blueprint(receipt_bp)
 
     # --- Content-Security-Policy header (production only, dev loosened) ---
     @app.after_request
@@ -258,7 +262,8 @@ def create_app(database_uri=None, engine_options=None):
 
     # Protect all data routes
     protected_prefixes = (
-        '/accounts', '/transactions', '/payments', '/debts', '/budgets', '/discounts',
+        '/accounts', '/transactions', '/payments', '/debts', '/budgets',
+        '/discounts', '/promotions', '/receipts',
     )
     protected_rules = ['/']
 

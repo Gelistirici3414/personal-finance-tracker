@@ -36,6 +36,8 @@
                 <li><a href="{{ url_for('debts.list_debts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Borçlar</a></li>
                 <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">Bütçeler</a></li>
                 <li><a href="{{ url_for('discounts.discounts') }}" class="px-3 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition">İndirimler</a></li>
+                <li><a href="{{ url_for('promo.promotions') }}" class="px-3 py-1.5 rounded-full text-sm bg-pink-700 hover:bg-pink-600 hover:text-white transition">Aktüel</a></li>
+                <li><a href="{{ url_for('receipt.receipts_page') }}" class="px-3 py-1.5 rounded-full text-sm bg-purple-700 hover:bg-purple-600 hover:text-white transition">Akıllı Giriş</a></li>
                 {% endif %}
             </ul>
 
@@ -71,6 +73,8 @@
                 <li><a href="{{ url_for('debts.list_debts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Borçlar</a></li>
                 <li><a href="{{ url_for('budgets.list_budgets') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">Bütçeler</a></li>
                 <li><a href="{{ url_for('discounts.discounts') }}" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-green-600 hover:text-white transition w-full text-center">İndirimler</a></li>
+                <li><a href="{{ url_for('promo.promotions') }}" class="px-4 py-2 rounded-lg text-sm bg-pink-700 hover:bg-pink-600 text-white transition w-full text-center">Aktüel</a></li>
+                <li><a href="{{ url_for('receipt.receipts_page') }}" class="px-4 py-2 rounded-lg text-sm bg-purple-700 hover:bg-purple-600 text-white transition w-full text-center">Akıllı Giriş</a></li>
                 {% endif %}
                 {% if is_logged_in %}
                 <li><a href="{{ url_for('auth.logout') }}" class="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-700 text-white transition w-full text-center">Çıkış</a></li>
