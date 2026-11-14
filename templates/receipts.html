@@ -23,14 +23,49 @@
             <div>
                 <label class="block text-gray-300 mb-1">Hesap</label>
                 <select name="account_id" required class="w-full bg-gray-700 rounded p-2 text-white">
-                    <option value="" disabled seçin>…</option>
+                    <option value="" disabled selected>Seçin…</option>
                     {% for acc in accounts %}
                     <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.type }})</option>
                     {% endfor %}
                 </select>
             </div>
+
+            <!-- Manual entry fields: always visible; used when OCR cannot find a price.
+                 On a successful OCR save the backend ignores these (the scanned
+                 price takes priority) but the user can still pre-fill them. -->
+            <div class="border-t border-gray-600 pt-3 mt-1">
+                <p class="text-xs text-gray-400 mb-2">
+                    <span class="text-yellow-400">⚠️ Manuel giriş (fişten fiyat çıkarılamazsa otomatik görünür):</span><br>
+                    OCR fiyatı bulamazsa aşağıdaki alanları doldurup tekrar <em>Kaydet</em> butonuna basın.
+                </p>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="block text-gray-300 mb-1 text-xs">Tutar (₺)</label>
+                        <input type="number" name="manual_amount" min="0.01" step="0.01"
+                               class="w-full bg-gray-700 rounded p-2 text-white" placeholder="150.00">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 mb-1 text-xs">Kategori</label>
+                        <input type="text" name="manual_category" list="category-list"
+                               class="w-full bg-gray-700 rounded p-2 text-white" placeholder="Market">
+                        <datalist id="category-list">
+                            <option value="Market"><option value="Bills">
+                            <option value="Fuel"><option value="Health">
+                            <option value="Transport"><option value="Personal">
+                        </datalist>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="block text-gray-300 mb-1 text-xs">Açıklama</label>
+                    <input type="text" name="description"
+                           class="w-full bg-gray-700 rounded p-2 text-white"
+                           placeholder="Örn: Migros alışverişi">
+                </div>
+            </div>
+
             <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded">Tara &amp; Kaydet</button>
         </form>
+
         <div id="receipt-result" class="mt-3 text-sm text-gray-400 hidden"></div>
     </div>
 
@@ -66,7 +101,8 @@ function commitSms(){
   }).catch(e=>{ document.getElementById('sms-result').textContent = 'Hata: '+e; });
 }
 // Intercept the receipt form to show JSON result inline.
-document.getElementById('receipt-form').addEventListener('submit', function(e){
+const receiptForm = document.getElementById('receipt-form');
+receiptForm.addEventListener('submit', function(e){
   e.preventDefault();
   const fd = new FormData(this);
   fetch(this.action, {method:'POST', body: fd})
@@ -74,9 +110,25 @@ document.getElementById('receipt-form').addEventListener('submit', function(e){
     .then(({status, d})=>{
       const el = document.getElementById('receipt-result');
       el.classList.remove('hidden');
+      if (status === 422 && !d.ok) {
+        // OCR could not extract a price — show the warning and let the user
+        // fill in the manual fields already visible above, then resubmit.
+        el.innerHTML =
+          '<div class="bg-yellow-900/40 border border-yellow-600 rounded p-3">' +
+          '<p class="text-yellow-300 font-semibold">⚠️ ' + (d.message || 'Fişten fiyat çıkarılamadı') + '</p>' +
+          (d.ocr_text ? '<pre class="text-xs text-gray-500 mt-2 whitespace-pre-wrap">' +
+            d.ocr_text.slice(0, 300) + '</pre>' : '') +
+          '<p class="text-gray-400 text-xs mt-2">Tutar, kategori ve açıklamayı doldurup yine bu butonla kaydedin:</p>' +
+          '</div>';
+        // Keep the manual fields visible & focus the amount input.
+        const amt = this.querySelector('[name="manual_amount"]');
+        if (amt) { amt.focus(); }
+        // Re-bind so the next submit carries manual_amount / manual_category.
+        return;
+      }
       el.innerHTML = d.ok
         ? '<span class="text-green-400">✅ Hareket kaydedildi: '+d.category+' — '+d.amount+'₺ ('+d.account+')</span>'
-        : '<span class="text-yellow-400">⚠️ '+(d.message||'OCR tamamlanamadı')+ (d.ocr_text ? '<pre class="text-xs text-gray-500">'+d.ocr_text.slice(0,200)+'</pre>' : '') +'</span>';
+        : '<span class="text-yellow-400">⚠️ '+(d.message||'OCR tamamlanamadı')+'</span>';
     }).catch(err=>{ document.getElementById('receipt-result').textContent='Hata: '+err; });
 });
 </script>

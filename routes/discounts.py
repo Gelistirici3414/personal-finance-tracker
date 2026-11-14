@@ -52,6 +52,10 @@ def _format_mock(deal):
     }
 
 
+def _format_mock_all(deals):
+    return [_format_mock(d) for d in deals]
+
+
 @discounts_bp.route('/discounts')
 def discounts():
     uid = session.get('user_id')
@@ -61,9 +65,20 @@ def discounts():
 
     # Load real scraped deals first.
     deals = get_recent_deals(market=market, hours=hours, limit=500)
-    # Fall back to mock data when DB is empty or user is not logged in.
-    if not deals and not uid:
-        deals = [_format_mock(d) for d in MARKET_DEALS]
+    # Always fall back to hard-coded mock offers when no fresh scraped deals
+    # are available, so the page is never empty (e.g. catalog sites blocked,
+    # scheduler not running, network error, or a logged-in user with an
+    # empty catalogue).
+    if not deals:
+        deals = _format_mock_all(MARKET_DEALS)
+        # When a market filter is active, filter the mock list the same way
+        # the real catalogue is filtered (case-insensitive, İ/I-insensitive)
+        # so the page does not end up empty because of a name mismatch
+        # (BIM vs BİM, SOK vs ŞOK).
+        if market:
+            key = market.upper().replace('İ', 'I')
+            deals = [d for d in deals
+                     if (d['market'] or '').upper().replace('İ', 'I') == key]
 
     if search:
         deals = [d for d in deals
@@ -77,6 +92,23 @@ def discounts():
                            is_scraping=is_running())
 
 
+def _deal_to_dict(d):
+    """Normalise a deal (PromoDeal ORM row or mock dict) into a JSON-safe shape."""
+    if isinstance(d, dict):
+        scraped = d.get('scraped_at')
+        return {'id': d.get('id'), 'market': d.get('market') or '',
+                'product': d.get('product') or '', 'price': d.get('price'),
+                'discount_pct': d.get('discount_pct'),
+                'image_url': d.get('image_url'),
+                'scraped_at': scraped.isoformat() if scraped else None}
+    scraped = getattr(d, 'scraped_at', None)
+    return {'id': getattr(d, 'id', None), 'market': getattr(d, 'market', '') or '',
+            'product': getattr(d, 'product', '') or '', 'price': getattr(d, 'price', None),
+            'discount_pct': getattr(d, 'discount_pct', None),
+            'image_url': getattr(d, 'image_url', None),
+            'scraped_at': scraped.isoformat() if scraped else None}
+
+
 @discounts_bp.route('/api/discounts', methods=['GET'])
 def api_discounts():
     if not session.get('user_id'):
@@ -87,20 +119,17 @@ def api_discounts():
 
     deals = get_recent_deals(market=market, hours=hours, limit=500)
     if not deals:
-        deals = [_format_mock(d) for d in MARKET_DEALS]
+        deals = _format_mock_all(MARKET_DEALS)
+        if market:
+            key = market.upper().replace('İ', 'I')
+            deals = [d for d in deals
+                     if (d.get('market') or '').upper().replace('İ', 'I') == key]
     if search:
         deals = [d for d in deals
-                 if search in (d.product or '').lower()
-                 or search in (getattr(d, 'market', '') or '').lower()]
+                 if search in ((d['product'] if isinstance(d, dict) else (getattr(d, 'product', '') or '')) or '').lower()
+                 or search in ((d['market'] if isinstance(d, dict) else (getattr(d, 'market', '') or '')) or '').lower()]
 
-    return jsonify([
-        {'id': getattr(d, 'id', None), 'market': getattr(d, 'market', ''),
-         'product': getattr(d, 'product', ''), 'price': getattr(d, 'price', None),
-         'discount_pct': getattr(d, 'discount_pct', None),
-         'image_url': getattr(d, 'image_url', None),
-         'scraped_at': getattr(d, 'scraped_at', None).isoformat() if getattr(d, 'scraped_at', None) else None}
-        for d in deals
-    ])
+    return jsonify([_deal_to_dict(d) for d in deals])
 
 
 @discounts_bp.route('/api/discounts/refresh', methods=['POST'])
@@ -109,7 +138,17 @@ def api_refresh():
         return jsonify(error='authentication required'), 401
     try:
         results = scrape_all_markets()
+        total = sum(int(n) for n in results.values())
+        if total == 0:
+            # Network/catalog failures yield zero fresh deals — surface a
+            # friendly status instead of pretending the refresh succeeded.
+            return jsonify(status='fallback',
+                          message=('Katalog sitelerinden yeni veri çekilemedi; '
+                                   'yedek (örnek) fırsatlar görüntüleniyor.'),
+                          scraped=results), 200
         return jsonify(status='ok', scraped=results), 200
     except Exception:
         logger.exception("Scrape failed during manual refresh")
-        return jsonify(error='scrape failed'), 500
+        return jsonify(status='error',
+                       message='Yenileme hatası; mevcut liste korunuyor.',
+                       error='scrape failed'), 500

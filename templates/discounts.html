@@ -63,15 +63,24 @@
 {% else %}
 <div class="bg-gray-800 p-8 rounded text-center">
     <p class="text-gray-400 mb-2">Henüz tarama yapılmamış fırsat bulunamadı.</p>
-    <p class="text-gray-500 text-xs">Arka plan servisini çalıştırın: <code class="text-green-400">python run_scheduler.py --once</code></p>
+    <p class="text-gray-500 text-xs">Arka plan servisini çalıştırın: <code class="text-green-400">python run_scheduler.py --once</code>
+    — yedek (örnek) fırsatlar "Yenile" ile otomatik gösterilir.</p>
 </div>
 {% endif %}
 
 <script>
 function refreshDeals(){
+    const btn = event.target;
+    if (btn) { btn.disabled = true; btn.textContent = 'Yenileniyor…'; }
     fetch('/api/discounts/refresh', {method:'POST', credentials:'same-origin'})
-     .then(r=>r.json()).then(d=>{ alert('Yenilendi: '+JSON.stringify(d.scraped)); location.reload(); })
-     .catch(e=>alert('Yenileme hatası: '+e));
+     .then(r=>r.json().then(d=>({status:r.status, d})))
+     .then(({status, d})=>{
+         if (status >= 400 || d.status === 'error') {
+             alert((d.message || d.error || 'Yenileme başarısız oldu.') + ' Sayfa yedek listeye geri döndürülüyor.');
+         }
+         location.reload();
+     })
+     .catch(()=>{ alert('Yenileme hatası: sunucuya ulaşılamadı. Sayfa yeniden yükleniyor.'); location.reload(); });
 }
 </script>
 {% endblock %}

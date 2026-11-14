@@ -41,6 +41,16 @@ def _infer_category(text: str) -> str:
     return 'Market'
 
 
+def _default_account(uid) -> Optional[Account]:
+    """Return the user's default account: the one flagged as default, else
+    the most recently created one, else the first one on record."""
+    accounts = Account.query.filter_by(user_id=uid).all()
+    if not accounts:
+        return None
+    defaults = [a for a in accounts if getattr(a, 'is_default', False)]
+    return defaults[0] if defaults else sorted(accounts, key=lambda a: a.id)[-1]
+
+
 @receipt_bp.route('/receipts')
 def receipts_page():
     accounts = Account.query.filter_by(user_id=session['user_id']).all()
@@ -63,9 +73,24 @@ def upload_receipt():
     parsed = parse_receipt_text(text) if text else {}
 
     price = parsed.get('price')
-    category = request.form.get('category') or _infer_category(text or uploaded.filename)
-    desc_lines = (request.form.get('description') or (text or '').strip().splitlines())
-    description = desc_lines[0][:150] if desc_lines and desc_lines[0] else 'Yüklenen fiş (OCR)'
+    # Manual fallback: when OCR could not find a price, the user may supply
+    # amount / category / description manually from the receipts.html form.
+    if price is None:
+        manual = request.form.get('manual_amount')
+        try:
+            price = float(str(manual).replace(',', '.').strip()) if manual else None
+        except ValueError:
+            price = None
+    category = request.form.get('category') or (
+        request.form.get('manual_category') or _infer_category(text or uploaded.filename))
+    # A user-typed description (form field) is a plain string; fall back to the
+    # first line of the OCR text when absent.
+    manual_desc = (request.form.get('description') or '').strip()
+    if manual_desc:
+        description = manual_desc[:150]
+    else:
+        ocr_lines = (text or '').strip().splitlines()
+        description = ocr_lines[0][:150] if ocr_lines and ocr_lines[0] else 'Yüklenen fiş (OCR)'
 
     if price is None:
         return jsonify({

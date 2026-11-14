@@ -1,4 +1,4 @@
-﻿import os
+import os
 from flask import Blueprint, render_template, session
 from models import db, Account, Transaction, UpcomingPayment, Budget
 from datetime import datetime, date, timedelta
@@ -115,15 +115,15 @@ def dashboard():
         prev_amt = prev_dict.get(cat, 0.0)
         if prev_amt == 0:
             if this_amt > 0:
-                insights.append(f"New spending detected in category '{cat}' this month: {this_amt:,.2f}â‚º.")
+                insights.append(f"Bu ay '{cat}' kategorisinde yeni harcama tespit edildi: {this_amt:,.2f} ₺.")
         else:
             diff_pct = ((this_amt - prev_amt) / prev_amt) * 100
             if diff_pct > 10:
-                insights.append(f"{cat.capitalize()} expenses increased by {diff_pct:.0f}% compared to last month. Consider reviewing your spending.")
+                insights.append(f"{cat.capitalize()} harcamaları geçen aya göre {diff_pct:.0f}% arttı. Harcamalarınızı gözden geçirmeniz önerilir.")
             elif diff_pct < -10:
-                insights.append(f"{cat.capitalize()} expenses decreased by {abs(diff_pct):.0f}% compared to last month. Good job saving!")
+                insights.append(f"{cat.capitalize()} harcamaları geçen aya göre {abs(diff_pct):.0f}% azaldı. Harcama yönetiminize devam ediyorsunuz!")
     if not insights:
-        insights.append('Your spending is stable compared to the previous month.')
+        insights.append('Harcamalarınız geçen aya göre dengeli seyrediyor.')
 
     days_min = today + timedelta(days=3)
     days_max = today + timedelta(days=5)

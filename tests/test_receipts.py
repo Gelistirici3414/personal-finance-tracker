@@ -51,6 +51,51 @@ def test_receipt_upload_no_price_returns_422(client, app, user):
     assert body['ok'] is False
 
 
+def test_receipts_page_shows_manual_entry_fields(client, app, user):
+    """Fix #3: the receipts page always renders the manual amount / category /
+    description form (used when OCR cannot find a price)."""
+    _make_test_account(client, app, user)
+    r = client.get('/receipts')
+    assert r.status_code == 200
+    text = r.get_data(as_text=True)
+    assert 'name="manual_amount"' in text
+    assert 'name="manual_category"' in text
+    assert 'Manuel giriş' in text
+
+
+def test_receipt_upload_manual_amount_when_ocr_fails(client, app, user):
+    """Fix #3: when OCR cannot find a price, manual_amount / manual_category
+    / description create a valid Transaction on resubmit."""
+    acc = _make_test_account(client, app, user)
+    with patch('routes.receipts.image_to_text', return_value=''), \
+         patch('routes.receipts._OCR_OK', True):
+        # 1st attempt — no manual values, still 422.
+        r = client.post('/receipts/upload',
+                        data={'account_id': str(acc.id),
+                              'receipt_file': (io.BytesIO(b'img'), 'empty.png')},
+                        content_type='multipart/form-data')
+        assert r.status_code == 422
+
+        # 2nd attempt — user filled the manual fields on the page.
+        r = client.post('/receipts/upload',
+                        data={'account_id': str(acc.id),
+                              'manual_amount': '150,75',
+                              'manual_category': 'Market',
+                              'description': 'Migros alışverişi',
+                              'receipt_file': (io.BytesIO(b'img'), 'empty.png')},
+                        content_type='multipart/form-data')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    body = r.get_json()
+    assert body['ok'] is True
+    assert body['amount'] == 150.75
+    assert body['category'] == 'Market'
+
+    with app.app_context():
+        txn = Transaction.query.filter_by(user_id=user.id).first()
+        assert txn is not None
+        assert txn.amount == 150.75
+        assert 'Migros' in txn.description
+
 def test_sms_preview_returns_parsed_dict(client, app, user):
     sms = "Garanti Bankası kredi kartınızdan 300 TL harcama yapılmıştır."
     r = client.get('/api/parse-sms?message=' + quote(sms))
