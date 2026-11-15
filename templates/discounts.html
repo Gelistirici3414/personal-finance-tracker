@@ -37,34 +37,39 @@
 {% if deals %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for d in deals %}
-    {% set is_obj = d.__class__.__name__ == 'PromoDeal' %}
-    {% set product  = d.product  if is_obj else d.get('product', '') %}
-    {% set market   = d.market   if is_obj else d.get('market', '') %}
-    {% set price    = d.price    if is_obj else d.get('price') %}
-    {% set discount = d.discount_pct if is_obj else d.get('discount_pct') %}
-    {% set img      = d.image_url if is_obj else d.get('image_url') %}
-    {% set scraped  = d.scraped_at if is_obj else d.get('scraped_at') %}
     <div class="bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition">
         <div class="flex justify-between items-start mb-2">
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ market }}</span>
-            {% if discount %}<span class="text-green-400 font-bold">-%{{ '%.0f'|format(discount) }}</span>{% endif %}
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ d.market }}</span>
+            {% if d.discount_pct %}<span class="text-green-400 font-bold">-%{{ '%.0f'|format(d.discount_pct) }}</span>{% endif %}
         </div>
-        {% if img %}<img src="{{ img }}" alt="{{ product }}" loading="lazy"
+        {% if d.image_url %}<img src="{{ d.image_url }}" alt="{{ d.product }}" loading="lazy"
              class="w-full h-32 object-cover rounded mb-3">{% endif %}
-        <h3 class="text-base font-semibold text-white mb-1">{{ product }}</h3>
-        {% if price is not none %}<p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ "{:,.2f}".format(price) }}₺</span></p>
-        {% elif d.get('note') %}<p class="text-yellow-300 text-sm">{{ d.note }}</p>
-        {% else %}<p class="text-gray-500 text-sm">Fiyat katalogda belirtilmiştir</p>
-        {% endif %}
-        {% if scraped %}<p class="text-gray-500 text-xs mt-2">📅 {{ scraped.strftime('%d.%m.%Y %H:%M') }}</p>{% endif %}
+        <h3 class="text-base font-semibold text-white mb-1">{{ d.product }}</h3>
+        <p class="text-blue-300 text-sm">Fiyat: <span class="font-semibold">{{ "{:,.2f}".format(d.price or 0) }}₺</span></p>
+        {% if d.scraped_at %}<p class="text-gray-500 text-xs mt-2">📅 {{ d.scraped_at.strftime('%d.%m.%Y %H:%M') }}</p>{% endif %}
     </div>
     {% endfor %}
 </div>
 {% else %}
+<!-- No real data: show an honest warning (never fake/mock products). -->
 <div class="bg-gray-800 p-8 rounded text-center">
-    <p class="text-gray-400 mb-2">Henüz tarama yapılmamış fırsat bulunamadı.</p>
-    <p class="text-gray-500 text-xs">Arka plan servisini çalıştırın: <code class="text-green-400">python run_scheduler.py --once</code>
-    — yedek (örnek) fırsatlar "Yenile" ile otomatik gösterilir.</p>
+    <p class="text-yellow-300 font-semibold mb-2">⚠️ Anlık indirim verisi alınamadı, lütfen tekrar deneyin.</p>
+    <p class="text-gray-400 text-sm mb-3">
+        Marketlerin (BİM, A101, ŞOK, Migros) katalog sayfalarından canlı veri
+        çekilemedi — bağlantı engellenmiş olabilir, katalog güncellenmemiş
+        olabilir ya da sayfa yapısı değişmiş olabilir.
+    </p>
+    <p class="text-gray-500 text-xs mb-4">
+        {% for m in markets %}
+        <span class="inline-block mr-3">{{ m }}:
+        {% set ts = last_scraped.get(m) %}
+        {% if ts %}son tarama {{ ts.strftime('%d.%m.%Y %H:%M') }}{% else %}henüz tarama yok{% endif %}
+        </span>
+        {% endfor %}
+    </p>
+    <button onclick="refreshDeals()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm transition">
+        Yenile &amp; Tekrar Dene
+    </button>
 </div>
 {% endif %}
 
@@ -76,7 +81,10 @@ function refreshDeals(){
      .then(r=>r.json().then(d=>({status:r.status, d})))
      .then(({status, d})=>{
          if (status >= 400 || d.status === 'error') {
-             alert((d.message || d.error || 'Yenileme başarısız oldu.') + ' Sayfa yedek listeye geri döndürülüyor.');
+             alert((d.message || d.error || 'Yenileme başarısız oldu.') +
+                   ' Sayfa yeniden yükleniyor.');
+         } else if (d.status === 'unavailable') {
+             alert(d.message || 'Anlık indirim verisi alınamadı, lütfen tekrar deneyin.');
          }
          location.reload();
      })

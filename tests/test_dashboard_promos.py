@@ -1,7 +1,7 @@
 """Tests for dashboard budget alerts + promotions page."""
 from datetime import date, timedelta
 from unittest.mock import patch
-from models import db, Account, Transaction, Budget
+from models import db, Account, Transaction, Budget, PromoDeal
 
 
 def _make_account(app, user, name='Cash', type='Cash', balance=100.0):
@@ -79,40 +79,61 @@ def test_discounts_page_renders(client, app, user):
     r = client.get('/discounts')
     assert r.status_code == 200
     text = r.get_data(as_text=True)
-    # Should show either scraped deals or mock fallback content.
-    assert 'İndirimler' in text or 'Fırsatlar' in text or 'Henüz tarama' in text
+    # Shows either real scraped deals or the honest "veri alınamadı" warning.
+    assert 'İndirimler' in text or 'Fırsatlar' in text \
+        or 'Anlık indirim verisi alınamadı' in text
 
 
-def test_discounts_page_never_empty_for_logged_in_user(client, app, user):
-    """Fix #1: even a logged-in user with zero scraped deals gets the mock
-    fallback catalogue (BİM / A101 / ŞOK / Migros sample offers)."""
+def test_discounts_page_shows_honest_warning_without_data(client, app, user):
+    """No scraped deals + no mock injection: the page shows the
+    'Anlık indirim verisi alınamadı, lütfen tekrar deneyin' warning and
+    NO fake products."""
     r = client.get('/discounts')
     assert r.status_code == 200
     text = r.get_data(as_text=True)
-    assert 'Henüz tarama yapılmamış' not in text
-    assert 'BİM' in text and 'Migros' in text
-    # The "Yenile" refresh button must be present.
+    assert 'Anlık indirim verisi alınamadı' in text
+    assert 'lütfen tekrar deneyin' in text
+    # Mock catalogue products must be absent.
+    for fake in ('Yarım Değerine Yağ', 'Toz Şeker 5kg',
+                 'Migros Hediye Çeki', 'Etiyem Kampanyası'):
+        assert fake not in text
+    # The refresh / retry button must be present.
     assert 'refreshDeals' in text
 
 
-def test_api_discounts_never_empty_when_logged_in(client, app, user):
-    """Fix #1: the JSON API also falls back to mock offers."""
+def test_discounts_page_renders_real_deals_when_scraped(client, app, user):
+    """When real scraped data exists, it renders (and no warning shows)."""
+    from datetime import datetime
+    with app.app_context():
+        deal = PromoDeal(market='BIM', product='Gerçek Ürün 1L',
+                         price=123.45, scraped_at=datetime.utcnow())
+        db.session.add(deal)
+        db.session.commit()
+    r = client.get('/discounts')
+    assert r.status_code == 200
+    text = r.get_data(as_text=True)
+    assert 'Gerçek Ürün 1L' in text
+    assert '123.45' in text  # rendered via "{:,.2f}".format()
+    with app.app_context():
+        db.session.rollback()
+
+
+def test_api_discounts_returns_empty_list_when_no_data(client, app, user):
+    """The JSON API returns an honest empty list (no mock offers)."""
     r = client.get('/api/discounts')
     assert r.status_code == 200
-    body = r.get_json()
-    assert isinstance(body, list) and len(body) >= 4
-    markets = {d['market'] for d in body}
-    assert {'BİM', 'Migros'} <= markets or {'BIM', 'MIGROS'} <= markets
+    assert r.get_json() == []
 
 
-def test_api_discounts_refresh_fallback_status(client, app, user):
-    """Fix #1: refresh that scrapes 0 fresh deals returns status 'fallback',
-    not an error — the page reloads onto the mock list."""
+def test_api_discounts_refresh_unavailable_status(client, app, user):
+    """Refresh that scrapes 0 fresh deals returns status 'unavailable' with
+    a Turkish warning message — never fake data."""
     with patch('routes.discounts.scrape_all_markets', return_value={}):
         r = client.post('/api/discounts/refresh')
     assert r.status_code == 200
     body = r.get_json()
-    assert body['status'] in ('fallback', 'ok')
+    assert body['status'] == 'unavailable'
+    assert 'Anlık indirim verisi alınamadı' in body['message']
     assert 'scraped' in body
 
 

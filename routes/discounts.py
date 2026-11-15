@@ -1,5 +1,5 @@
-"""Discounts & market deals — unified page serving both scraped (real-time)
-and mock (fallback) offers for BİM, A101, ŞOK and Migros weekly catalogues.
+"""Discounts & market deals — unified page serving REAL, live-scraped
+offers for BİM, A101, ŞOK and Migros weekly catalogues.
 
 Endpoints:
     GET  /discounts              → HTML list with filters (market, search)
@@ -7,79 +7,30 @@ Endpoints:
     POST /api/discounts/refresh  → trigger an immediate scrape cycle
 
 The scraper runs in a background worker (run_scheduler.py).  This module
-queries PromoDeal from the database; if none are found it falls back to
-hard-coded mock deals so the UI is never empty.
+queries PromoDeal from the database and shows ONLY real scraped data.
+When no recent data is available the page shows an honest
+"Anlık indirim verisi alınamadı" warning — never fake/mock products.
 """
 import logging
 from flask import Blueprint, render_template, request, jsonify, session
 from models import PromoDeal
-from services.scrapers import get_recent_deals, scrape_all_markets, CATALOG_URLS
+from services.scrapers import (get_recent_deals, scrape_all_markets,
+                               CATALOG_URLS, get_last_scraped_per_market)
 from services.scheduler import is_running
 
 logger = logging.getLogger(__name__)
 
 discounts_bp = Blueprint('discounts', __name__)
 
-# Fallback mock data when no scraped deals are available.
-MARKET_DEALS = [
-    {"market": "BİM",   "product": "Yarım Değerine Yağ",          "discount_pct": 50.0,  "price": 89.90,  "brochure": "Yarın Yine Yarım Fiyat"},
-    {"market": "BİM",   "product": "Toz Şeker 5kg",                "discount_pct": None,  "price": 250.00, "brochure": "Sıkça Aranan"},
-    {"market": "BİM",   "product": "Makarna Kampanyası",           "discount_pct": None,  "price": 10.00,  "brochure": "Sıkça Aranan", "note": "2. ürün"},
-    {"market": "BİM",   "product": "Deterjan 2x1",                 "discount_pct": None,  "price": None,   "brochure": "Sıkça Aranan", "note": "1 Al 1 Kazan"},
-    {"market": "A101",  "product": "Süt İşleri Çeşitli",           "discount_pct": 30.0,  "price": None,   "brochure": "A101 Kataloğu"},
-    {"market": "A101",  "product": "Kartofel Çeşitleri",           "discount_pct": 40.0,  "price": None,   "brochure": "Sezon Fiyatı"},
-    {"market": "A101",  "product": "Etiyem Kampanyası",            "discount_pct": 50.0,  "price": None,   "brochure": "A101 Kataloğu", "note": "İkincisi %50"},
-    {"market": "ŞOK",   "product": "Yerli Domates",                "discount_pct": None,  "price": 300.00, "brochure": "Şok Kampanya", "note": "1kg"},
-    {"market": "ŞOK",   "product": "Beyaz Eşya Dönüşümü",          "discount_pct": 20.0,  "price": None,   "brochure": "Broşür"},
-    {"market": "ŞOK",   "product": "Grip ve Soğuk Algınlığı",      "discount_pct": 35.0,  "price": None,   "brochure": "Şok Kampanya"},
-    {"market": "Migros","product": "Migros Hediye Çeki",           "discount_pct": None,  "price": 200.00, "brochure": "Migros Sanal Market"},
-    {"market": "Migros","product": "Kahvaltılıklar",               "discount_pct": 25.0,  "price": None,   "brochure": "Migros Kataloğu"},
-    {"market": "Migros","product": "Kartına Özgü 100₺ Bonus",     "discount_pct": None,  "price": 100.00, "brochure": "Migros Kart"},
-]
-
-
-def _format_mock(deal):
-    """Convert a mock deal dict into the same shape as a PromoDeal ORM row."""
-    return {
-        'id': None,
-        'market': deal['market'],
-        'product': deal['product'],
-        'price': deal.get('price'),
-        'discount_pct': deal.get('discount_pct'),
-        'image_url': None,
-        'scraped_at': None,
-        'source_page': deal.get('brochure'),
-    }
-
-
-def _format_mock_all(deals):
-    return [_format_mock(d) for d in deals]
-
 
 @discounts_bp.route('/discounts')
 def discounts():
-    uid = session.get('user_id')
     market = request.args.get('market')
     search = request.args.get('search', '').strip().lower()
     hours = int(request.args.get('hours', 168))
 
-    # Load real scraped deals first.
+    # Real scraped data only — mock offers are intentionally NOT injected.
     deals = get_recent_deals(market=market, hours=hours, limit=500)
-    # Always fall back to hard-coded mock offers when no fresh scraped deals
-    # are available, so the page is never empty (e.g. catalog sites blocked,
-    # scheduler not running, network error, or a logged-in user with an
-    # empty catalogue).
-    if not deals:
-        deals = _format_mock_all(MARKET_DEALS)
-        # When a market filter is active, filter the mock list the same way
-        # the real catalogue is filtered (case-insensitive, İ/I-insensitive)
-        # so the page does not end up empty because of a name mismatch
-        # (BIM vs BİM, SOK vs ŞOK).
-        if market:
-            key = market.upper().replace('İ', 'I')
-            deals = [d for d in deals
-                     if (d['market'] or '').upper().replace('İ', 'I') == key]
-
     if search:
         deals = [d for d in deals
                  if search in (d.product or '').lower()
@@ -87,23 +38,20 @@ def discounts():
                  or search in (getattr(d, 'ocr_text', '') or '').lower()]
 
     markets = list(CATALOG_URLS.keys())
+    last_scraped = get_last_scraped_per_market()
     return render_template('discounts.html', deals=deals, markets=markets,
                            active_market=market or '', search=search,
-                           is_scraping=is_running())
+                           is_scraping=is_running(),
+                           last_scraped=last_scraped)
 
 
 def _deal_to_dict(d):
-    """Normalise a deal (PromoDeal ORM row or mock dict) into a JSON-safe shape."""
-    if isinstance(d, dict):
-        scraped = d.get('scraped_at')
-        return {'id': d.get('id'), 'market': d.get('market') or '',
-                'product': d.get('product') or '', 'price': d.get('price'),
-                'discount_pct': d.get('discount_pct'),
-                'image_url': d.get('image_url'),
-                'scraped_at': scraped.isoformat() if scraped else None}
+    """Normalise a PromoDeal ORM row into a JSON-safe shape."""
     scraped = getattr(d, 'scraped_at', None)
-    return {'id': getattr(d, 'id', None), 'market': getattr(d, 'market', '') or '',
-            'product': getattr(d, 'product', '') or '', 'price': getattr(d, 'price', None),
+    return {'id': getattr(d, 'id', None),
+            'market': getattr(d, 'market', '') or '',
+            'product': getattr(d, 'product', '') or '',
+            'price': getattr(d, 'price', None),
             'discount_pct': getattr(d, 'discount_pct', None),
             'image_url': getattr(d, 'image_url', None),
             'scraped_at': scraped.isoformat() if scraped else None}
@@ -117,17 +65,12 @@ def api_discounts():
     search = request.args.get('search', '').strip().lower()
     hours = int(request.args.get('hours', 168))
 
+    # Real data only — an empty catalogue returns an empty JSON list.
     deals = get_recent_deals(market=market, hours=hours, limit=500)
-    if not deals:
-        deals = _format_mock_all(MARKET_DEALS)
-        if market:
-            key = market.upper().replace('İ', 'I')
-            deals = [d for d in deals
-                     if (d.get('market') or '').upper().replace('İ', 'I') == key]
     if search:
         deals = [d for d in deals
-                 if search in ((d['product'] if isinstance(d, dict) else (getattr(d, 'product', '') or '')) or '').lower()
-                 or search in ((d['market'] if isinstance(d, dict) else (getattr(d, 'market', '') or '')) or '').lower()]
+                 if search in (getattr(d, 'product', '') or '').lower()
+                 or search in (getattr(d, 'market', '') or '').lower()]
 
     return jsonify([_deal_to_dict(d) for d in deals])
 
@@ -140,15 +83,17 @@ def api_refresh():
         results = scrape_all_markets()
         total = sum(int(n) for n in results.values())
         if total == 0:
-            # Network/catalog failures yield zero fresh deals — surface a
-            # friendly status instead of pretending the refresh succeeded.
-            return jsonify(status='fallback',
-                          message=('Katalog sitelerinden yeni veri çekilemedi; '
-                                   'yedek (örnek) fırsatlar görüntüleniyor.'),
-                          scraped=results), 200
+            # Honest status: nothing could be fetched — the page will show
+            # the "veri alınamadı" warning instead of fake products.
+            return jsonify(status='unavailable',
+                           message=('Anlık indirim verisi alınamadı, '
+                                    'lütfen tekrar deneyin.'),
+                           scraped=results), 200
         return jsonify(status='ok', scraped=results), 200
     except Exception:
         logger.exception("Scrape failed during manual refresh")
         return jsonify(status='error',
                        message='Yenileme hatası; mevcut liste korunuyor.',
                        error='scrape failed'), 500
+
+
